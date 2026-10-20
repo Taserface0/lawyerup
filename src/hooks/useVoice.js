@@ -118,20 +118,22 @@ export function useSpeechRecognition({ lang, onFinal, onEnd }) {
   return { supported: Boolean(Ctor), status, interim, start, stop, abort };
 }
 
-// Ranks the device's voices: right language first, then the "Natural" /
-// "Online" neural voices Edge and Chrome offer, which sound far less robotic
-// than the older built-in ones.
+// Ranks the device's voices. Smoothness matters more than the exact accent:
+// the old built-in Windows voices (e.g. "Microsoft Heera/Ravi") sound harsh,
+// so a neural voice ("Natural"/"Online" in Edge) or a Google voice in Chrome
+// wins over them even when it is, say, en-GB instead of en-IN.
 export function pickBrowserVoice(voices, locale) {
   const prefix = locale.slice(0, 2);
   let best = null;
   let bestScore = 0;
   for (const v of voices || []) {
     const lang = (v.lang || '').replace('_', '-');
-    let score = lang === locale ? 6 : lang.startsWith(prefix) ? 3 : 0;
+    let score = lang === locale ? 3 : lang.startsWith(prefix) ? 2 : 0;
     if (!score) continue;
-    if (/natural|online|neural/i.test(v.name)) score += 4;
-    if (/google/i.test(v.name)) score += 2;
+    if (/natural|online|neural/i.test(v.name)) score += 5;
+    if (/google/i.test(v.name)) score += 4;
     if (!v.localService) score += 1;
+    if (/female/i.test(v.name)) score += 1; // usually the softer of a pair
     if (score > bestScore) [best, bestScore] = [v, score];
   }
   return best;
@@ -229,8 +231,9 @@ export function useSpeechSynthesis({ lang }) {
 
       if (!naturalVoiceAvailable) return speakWithBrowser(splitForSpeech(text));
 
-      // Natural voice: short first part so speech starts quickly, then larger parts.
-      const parts = splitForSpeech(text, 600);
+      // Natural voice: one request per answer where possible (the server
+      // accepts 1,500 characters), since the free tier allows few per day.
+      const parts = splitForSpeech(text, 1500);
       const controller = new AbortController();
       abortRef.current = controller;
       const load = (i) => (i < parts.length ? fetchNaturalAudio(parts[i], lang, controller.signal) : null);

@@ -65,4 +65,16 @@ describe('pickBrowserVoice', () => {
     expect(pickBrowserVoice(voices, 'hi-IN').name).toMatch(/Swara/);
     expect(pickBrowserVoice([], 'hi-IN')).toBeNull();
   });
+  it('prefers a smooth Google voice over the harsh built-in Windows one in Chrome', () => {
+    const chrome = [
+      { name: 'Microsoft Heera - English (India)', lang: 'en-IN', localService: true },
+      { name: 'Microsoft Ravi - English (India)', lang: 'en-IN', localService: true },
+      { name: 'Google US English', lang: 'en-US', localService: false },
+      { name: 'Google UK English Female', lang: 'en-GB', localService: false },
+      { name: 'Google हिन्दी', lang: 'hi-IN', localService: false },
+      { name: 'Microsoft Kalpana - Hindi (India)', lang: 'hi-IN', localService: true },
+    ];
+    expect(pickBrowserVoice(chrome, 'en-IN').name).toBe('Google UK English Female');
+    expect(pickBrowserVoice(chrome, 'hi-IN').name).toBe('Google हिन्दी');
+  });
 });
