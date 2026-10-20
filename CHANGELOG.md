@@ -1,0 +1,73 @@
+# Changelog
+
+## 0.8.5 (2026-10-20)
+
+- Voice capability questions now get a brief confirmation; speech transcription details are only provided when asked.
+- Gemini speech sends only the assistant's reply to TTS, preventing voice style instructions from being spoken; voice interaction questions now get an accurate explanation of browser speech transcription.
+- Default Gemini model is now `gemini-flash-lite-latest`; the previous default timed out before a fallback answered, adding about 45 seconds in a measured chat request.
+- Gemini resilience: overloaded (503), rate-limited (429) and timed-out requests are retried, then answered by backup models (`gemini-flash-latest`, `gemini-flash-lite-latest`, configurable with `GEMINI_FALLBACK_MODELS`).
+- Gemini answers use a low thinking level, so replies come back in seconds instead of 40+; models that don't accept the setting are retried without it.
+- Natural voice: answers are spoken with Gemini's speech voices (warm "Sulafat" voice by default, same `GEMINI_API_KEY`, served by the new `/api/tts`), part by part so speech starts quickly. If that's unavailable, the app picks the best voice on the device, preferring Edge/Chrome "Natural" voices over the robotic built-in ones.
+- Production server: microphone allowed for the app itself (voice didn't work under `npm start`), and the CSP allows the generated audio.
+- When every model is busy the chat says so in plain words (in all three languages) and repeats the 112 / 15100 helplines.
+- Welcome popup: signed-out visitors landing on Home get a sign in / create account sheet (once per browser session) with "Maybe later" and a link for lawyers. It closes by itself after signing in. 4 new strings in all three languages (429 keys).
+- 8 new tests (72 total).
+
+## 0.8.4 (2026-10-20)
+
+- Voice call mode: a phone button in the chat header opens a hands-free conversation (listen → answer spoken → listen again), with tap-to-interrupt, pause and end call, in English, Hindi and Hinglish. Crisis questions show the helplines on the call screen. After three silent turns the call pauses.
+- Long answers are spoken sentence by sentence, avoiding Chrome's cut-off on long speech.
+- A failing speech engine can no longer crash the chat screen.
+- 10 new translated strings (424 keys in parity) and 2 new tests (64 total).
+
+## 0.8.3 (2026-10-20)
+
+- Default Gemini model is now `gemini-3.8-flash`: Google no longer offers `gemini-2.5-flash` to new keys (it returned 404).
+- If Google retires a model and names a replacement, the server switches to it automatically and says so in the terminal.
+- Gemini requests use the model's default temperature, as Google recommends for current models.
+
+## 0.8.2 (2026-10-20)
+
+- `npm run dev` prints the AI setup at startup (`[ai] Assistant connected: gemini (gemini-2.5-flash)`) and flags common mistakes: key left in `.env.example`, no `.env` file, invalid model name.
+- An invalid `GEMINI_MODEL` (for example just `gemini`) falls back to the default instead of failing every request.
+- In dev builds, a failed answer shows the provider's reason under the error message (rejected key, wrong model, quota). Production still shows only the friendly message.
+- Accepts both Gemini key formats (`AQ.` and `AIza`) and trims stray spaces or quotes.
+
+## 0.8.1 (2026-10-20)
+
+- Free AI option: Google Gemini (`AI_PROVIDER=gemini`, `GEMINI_API_KEY`) alongside Anthropic Claude. Both run through the same guardrails, retrieval and citation checks.
+- `npm start` now reads `.env` (previously only `npm run dev` did).
+- README: step-by-step Windows + VS Code setup, dev vs production commands, troubleshooting.
+- Detention questions phrased "how long can they keep him" now find the 24-hour rule (BNSS s.58).
+- Privacy notice draft covers both providers and warns that the free Gemini tier is for demos only.
+- 10 new tests (58 total).
+
+## 0.8.0 (2026-10-20)
+
+### Security
+- AI calls moved behind a server-side `/api/chat` proxy; the API key no longer ships to browsers.
+- Mock admin console removed from production builds; OTP guesses capped at 5; rate limits and size limits on the AI endpoint; security headers on the production server; minimum password length raised to 8.
+
+### AI
+- Retrieval over a curated Indian-law knowledge base, with grounded citations shown under each answer.
+- PII redaction, deterministic crisis detection with a helplines card, prompt-injection hardening.
+- JSON-schema structured output, prompt caching, refusal fallback, structured logs.
+- Voice mode: speak your question, hear the answer (English, Hindi, Hinglish).
+- 28-case eval suite (offline in CI, live on demand).
+
+### Fixes
+- Bookings record the real slot date instead of "Today".
+- Lawyer accounts can't book consultations.
+- No duplicate lawyer listing; only verified lawyers are listed.
+- Enter no longer drops a message while the AI is replying; case numbers never repeat; "New" instead of ★ 0 (0); theme and language persist; `<html lang>` follows the UI language; Indian mobile validation.
+
+### Compliance
+- Privacy notice, terms of use and AI disclaimer drafts plus an in-app Legal screen.
+- Self-service account and data deletion (reviews anonymised).
+- Removed a false "sent to your WhatsApp" claim; emergency numbers updated to 112, 181, 1098, 1930 and 15100.
+
+### Project
+- README, AGENTS.md, CONTRIBUTING, SECURITY, LICENSE, ESLint, Vitest (48 tests), i18n parity check, GitHub Actions CI.
+
+## 0.7.0
+- Previous prototype (client and lawyer flows, marketplace, consultations, case resolution, reviews, messages).

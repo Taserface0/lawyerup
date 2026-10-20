@@ -1,0 +1,335 @@
+// =============================================================================
+// Curated Indian-law knowledge base for the "Know Your Rights" assistant.
+//
+// This is the retrieval corpus for RAG: the server picks the few passages
+// most relevant to a question and hands ONLY those to the model as numbered
+// sources, then checks that every citation in the answer points at one of
+// them (see src/ai/grounding.js). Keeping the corpus small, curated and
+// reviewable is deliberate — for legal information a short list of passages
+// a lawyer has checked beats a large scraped corpus nobody has read.
+//
+// Rules for editing:
+//  - `id` is permanent once shipped (evals and logs refer to it).
+//  - `text` must state only what the provision says, in plain language.
+//  - Criminal procedure uses the BNS / BNSS / BSA, in force from 1 July 2024.
+//    Old IPC/CrPC numbers appear only in `formerly` to help users who search
+//    for them.
+//  - `keywords` include English, Hinglish and Hindi terms people actually type.
+//  - Every entry should be reviewed by a qualified advocate before launch
+//    (tracked in docs/AI.md).
+// =============================================================================
+
+export const KNOWLEDGE_BASE = [
+  // ---------------------------------------------------------------- arrest
+  {
+    id: 'bnss-47',
+    category: 'criminal',
+    law: 'Bharatiya Nagarik Suraksha Sanhita, 2023',
+    section: 'Section 47',
+    formerly: 'CrPC s.50',
+    title: 'Right to know the grounds of arrest and right to bail',
+    text: 'A police officer arresting a person without a warrant must immediately tell them the full grounds of arrest. If the offence is bailable, the officer must also tell them they are entitled to be released on bail and can arrange sureties.',
+    keywords: ['arrest', 'arrested', 'grounds', 'giraftaar', 'giraftar', 'pakad', 'police ne pakda', 'bail', 'गिरफ्तार', 'गिरफ्तारी', 'जमानत'],
+  },
+  {
+    id: 'bnss-48',
+    category: 'criminal',
+    law: 'Bharatiya Nagarik Suraksha Sanhita, 2023',
+    section: 'Section 48',
+    formerly: 'CrPC s.50A',
+    title: 'Police must inform a relative or friend about the arrest',
+    text: 'The police must inform a relative, friend or other person nominated by the arrested person about the arrest and where they are being held, and must tell the arrested person of this right as soon as they are brought to the police station.',
+    keywords: ['arrest', 'inform family', 'relative', 'ghar walon ko', 'family ko batana', 'custody', 'गिरफ्तार', 'परिवार'],
+  },
+  {
+    id: 'bnss-58',
+    category: 'criminal',
+    law: 'Bharatiya Nagarik Suraksha Sanhita, 2023',
+    section: 'Section 58',
+    formerly: 'CrPC s.57',
+    title: 'No detention beyond 24 hours without a magistrate',
+    text: 'A person arrested without a warrant cannot be kept in police custody for more than 24 hours (excluding travel time to the court) unless a magistrate orders further detention.',
+    keywords: ['24 hours', 'how long', 'keep him', 'keep her', 'held', 'custody', 'detention', 'lockup', 'magistrate', 'hirasat', 'thana', 'two days', 'do din', 'हिरासत', 'मजिस्ट्रेट', 'थाने', 'थाना', 'दिन'],
+  },
+  {
+    id: 'bnss-38',
+    category: 'criminal',
+    law: 'Bharatiya Nagarik Suraksha Sanhita, 2023',
+    section: 'Section 38',
+    formerly: 'CrPC s.41D',
+    title: 'Right to meet an advocate during interrogation',
+    text: 'An arrested person is entitled to meet an advocate of their choice during interrogation, though not necessarily throughout the whole interrogation.',
+    keywords: ['lawyer', 'advocate', 'interrogation', 'questioning', 'vakil', 'poochtaach', 'वकील', 'पूछताछ'],
+  },
+  {
+    id: 'bnss-35-notice',
+    category: 'criminal',
+    law: 'Bharatiya Nagarik Suraksha Sanhita, 2023',
+    section: 'Section 35(3)–(6)',
+    formerly: 'CrPC s.41A',
+    title: 'Notice of appearance instead of arrest',
+    text: 'For many offences where arrest is not required, police must issue a written notice asking the person to appear before them. If the person complies with the notice, they generally shall not be arrested for that offence unless the officer records reasons.',
+    keywords: ['notice', 'summons', 'appear', 'police station bulaya', 'notice of appearance', 'नोटिस', 'बुलाया'],
+  },
+  {
+    id: 'bnss-43-women',
+    category: 'criminal',
+    law: 'Bharatiya Nagarik Suraksha Sanhita, 2023',
+    section: 'Section 43(5)',
+    formerly: 'CrPC s.46(4)',
+    title: 'Arrest of women after sunset',
+    text: 'Except in exceptional circumstances, no woman shall be arrested after sunset and before sunrise. In such exceptional cases a woman police officer must obtain prior permission from the Judicial Magistrate.',
+    keywords: ['woman arrest', 'night', 'sunset', 'mahila', 'raat', 'lady police', 'महिला', 'रात'],
+  },
+  {
+    id: 'bnss-482',
+    category: 'criminal',
+    law: 'Bharatiya Nagarik Suraksha Sanhita, 2023',
+    section: 'Section 482',
+    formerly: 'CrPC s.438',
+    title: 'Anticipatory bail',
+    text: 'A person who fears arrest for a non-bailable offence can apply to the Sessions Court or High Court for anticipatory bail, a direction that they be released on bail if arrested.',
+    keywords: ['anticipatory bail', 'agrim jamanat', 'fear arrest', 'false case', 'jhootha case', 'अग्रिम जमानत'],
+  },
+  {
+    id: 'const-art-22',
+    category: 'criminal',
+    law: 'Constitution of India',
+    section: 'Article 22(1)–(2)',
+    title: 'Constitutional safeguards on arrest',
+    text: 'Every arrested person must be told the grounds of arrest as soon as possible, has the right to consult and be defended by a lawyer of their choice, and must be produced before the nearest magistrate within 24 hours.',
+    keywords: ['constitution', 'fundamental right', 'arrest', 'article 22', 'lawyer', 'संविधान', 'मौलिक अधिकार'],
+  },
+  {
+    id: 'const-art-20-3',
+    category: 'criminal',
+    law: 'Constitution of India',
+    section: 'Article 20(3)',
+    title: 'Right against self-incrimination',
+    text: 'No person accused of an offence can be compelled to be a witness against themselves.',
+    keywords: ['self incrimination', 'confession', 'forced statement', 'silent', 'jabardasti bayan', 'बयान'],
+  },
+  // ------------------------------------------------------------------- FIR
+  {
+    id: 'bnss-173',
+    category: 'criminal',
+    law: 'Bharatiya Nagarik Suraksha Sanhita, 2023',
+    section: 'Section 173',
+    formerly: 'CrPC s.154',
+    title: 'Registering an FIR, including Zero FIR and e-FIR',
+    text: 'Information about a cognizable offence can be given to any police station, orally or electronically, irrespective of where the offence happened (Zero FIR). The police must record it, read it back, and give the informant a free copy. If the police refuse, the informant can send the information to the Superintendent of Police.',
+    keywords: ['fir', 'complaint', 'police refuse', 'zero fir', 'e-fir', 'online fir', 'report', 'shikayat', 'fir nahi likh rahe', 'एफआईआर', 'शिकायत'],
+  },
+  // --------------------------------------------------------------- traffic
+  {
+    id: 'mva-130',
+    category: 'other',
+    law: 'Motor Vehicles Act, 1988',
+    section: 'Section 130',
+    title: 'Producing your licence and registration',
+    text: 'A driver must produce their driving licence, and the registration and other documents, when asked by a police officer in uniform. Documents shown through DigiLocker or mParivahan are treated as valid.',
+    keywords: ['traffic police', 'licence', 'license', 'challan', 'documents', 'rc', 'digilocker', 'traffic', 'चालान', 'लाइसेंस'],
+  },
+  {
+    id: 'mva-206',
+    category: 'other',
+    law: 'Motor Vehicles Act, 1988',
+    section: 'Sections 206–207',
+    title: 'What traffic police can seize',
+    text: 'Police may impound documents (s.206) and, in specific situations such as driving without registration or a permit, detain the vehicle (s.207). The Act does not authorise an officer to take away vehicle keys as a punishment; ask for a receipt for anything seized and for a proper challan.',
+    keywords: ['keys', 'chaabi', 'chabi', 'traffic police', 'seize', 'impound', 'vehicle', 'challan', 'चाबी', 'गाड़ी'],
+  },
+  // ------------------------------------------------------- women & family
+  {
+    id: 'pwdva-12',
+    category: 'family',
+    law: 'Protection of Women from Domestic Violence Act, 2005',
+    section: 'Sections 12, 17, 18',
+    title: 'Protection from domestic violence',
+    text: 'A woman facing domestic violence can apply to a Magistrate (directly or through a Protection Officer) for protection orders, residence orders and monetary relief. She has the right to reside in the shared household and cannot be evicted except by due process.',
+    keywords: ['domestic violence', 'husband beats', 'in-laws', 'sasural', 'pati maarta', 'ghar se nikala', 'घरेलू हिंसा', 'ससुराल'],
+  },
+  {
+    id: 'bns-85',
+    category: 'family',
+    law: 'Bharatiya Nyaya Sanhita, 2023',
+    section: 'Sections 85–86',
+    formerly: 'IPC s.498A',
+    title: 'Cruelty by husband or his relatives',
+    text: 'Cruelty by a husband or his relatives towards a woman, including harassment for dowry or conduct likely to drive her to self-harm, is a criminal offence punishable with imprisonment up to three years and fine.',
+    keywords: ['cruelty', 'dowry', 'dahej', 'harassment', '498a', 'husband', 'दहेज', 'क्रूरता'],
+  },
+  {
+    id: 'hma-13b',
+    category: 'family',
+    law: 'Hindu Marriage Act, 1955',
+    section: 'Section 13B',
+    title: 'Divorce by mutual consent',
+    text: 'Spouses who have lived separately for at least one year and agree to divorce can file a joint petition. The court ordinarily waits six months before the second motion, but the Supreme Court has held this waiting period can be waived in suitable cases.',
+    keywords: ['divorce', 'mutual consent', 'talaq', 'separation', 'talak', 'तलाक'],
+  },
+  {
+    id: 'posh-9',
+    category: 'other',
+    law: 'Sexual Harassment of Women at Workplace (Prevention, Prohibition and Redressal) Act, 2013',
+    section: 'Section 9',
+    title: 'Complaining about sexual harassment at work',
+    text: 'A woman can make a written complaint of workplace sexual harassment to the Internal Committee (or the Local Committee if the employer has none) within three months of the incident; the committee may extend this by another three months for valid reasons.',
+    keywords: ['sexual harassment', 'workplace', 'office', 'boss', 'posh', 'internal committee', 'यौन उत्पीड़न', 'ऑफिस'],
+  },
+  // ----------------------------------------------------------------- cyber
+  {
+    id: 'cyber-1930',
+    category: 'cyber',
+    law: 'National Cyber Crime Reporting Portal',
+    section: 'Helpline 1930 / cybercrime.gov.in',
+    title: 'Reporting online fraud quickly',
+    text: 'Victims of online financial fraud should call 1930 or report at cybercrime.gov.in as soon as possible; quick reporting improves the chance that the money can be frozen. Keep screenshots, transaction IDs and messages as evidence.',
+    keywords: ['online fraud', 'upi fraud', 'scam', 'money stolen', 'paise kat gaye', 'otp fraud', 'cyber', 'धोखाधड़ी', 'ठगी'],
+  },
+  {
+    id: 'it-66c-66d',
+    category: 'cyber',
+    law: 'Information Technology Act, 2000',
+    section: 'Sections 66C and 66D',
+    title: 'Identity theft and cheating by impersonation online',
+    text: 'Fraudulently using another person’s password, electronic signature or other unique identification (s.66C), or cheating by impersonation using a computer resource (s.66D), are offences punishable with imprisonment up to three years and fine.',
+    keywords: ['identity theft', 'fake profile', 'impersonation', 'hacked', 'password', 'fake account', 'पहचान'],
+  },
+  {
+    id: 'it-66e-67',
+    category: 'cyber',
+    law: 'Information Technology Act, 2000',
+    section: 'Sections 66E, 67, 67A',
+    title: 'Private images and sexually explicit content',
+    text: 'Capturing or sharing images of a person’s private area without consent (s.66E) and publishing or transmitting obscene or sexually explicit material electronically (ss.67, 67A) are offences.',
+    keywords: ['morphed photos', 'nude', 'private photos', 'leak', 'video viral', 'sextortion', 'blackmail', 'तस्वीर'],
+  },
+  {
+    id: 'bns-308',
+    category: 'cyber',
+    law: 'Bharatiya Nyaya Sanhita, 2023',
+    section: 'Section 308',
+    formerly: 'IPC s.383–384',
+    title: 'Extortion (including online blackmail)',
+    text: 'Intentionally putting a person in fear of injury to make them hand over money or property is extortion, punishable with imprisonment. Do not pay; preserve the threats and report to police or cybercrime.gov.in.',
+    keywords: ['blackmail', 'extortion', 'threat', 'paise maang raha', 'dhamki', 'sextortion', 'ब्लैकमेल', 'धमकी'],
+  },
+  {
+    id: 'bns-351',
+    category: 'criminal',
+    law: 'Bharatiya Nyaya Sanhita, 2023',
+    section: 'Section 351',
+    formerly: 'IPC s.503/506',
+    title: 'Criminal intimidation',
+    text: 'Threatening someone with injury to their person, reputation or property to make them do or stop doing something is criminal intimidation.',
+    keywords: ['threat', 'threatening', 'dhamki', 'intimidation', 'jaan se maarne', 'धमकी'],
+  },
+  {
+    id: 'bns-78',
+    category: 'cyber',
+    law: 'Bharatiya Nyaya Sanhita, 2023',
+    section: 'Section 78',
+    formerly: 'IPC s.354D',
+    title: 'Stalking (offline and online)',
+    text: 'Repeatedly following or contacting a woman despite clear disinterest, or monitoring her use of the internet, email or electronic communication, is the offence of stalking.',
+    keywords: ['stalking', 'following', 'stalker', 'peecha', 'messages', 'पीछा'],
+  },
+  {
+    id: 'bns-318',
+    category: 'criminal',
+    law: 'Bharatiya Nyaya Sanhita, 2023',
+    section: 'Section 318',
+    formerly: 'IPC s.415/420',
+    title: 'Cheating',
+    text: 'Deceiving someone to dishonestly induce them to hand over property or do something they would not otherwise do is cheating, punishable with imprisonment and fine.',
+    keywords: ['cheating', 'fraud', 'dhokha', '420', 'cheated', 'धोखा'],
+  },
+  // -------------------------------------------------------------- property
+  {
+    id: 'tpa-106',
+    category: 'property',
+    law: 'Transfer of Property Act, 1882',
+    section: 'Section 106',
+    title: 'Notice to end a monthly tenancy',
+    text: 'Unless the rent agreement or local law says otherwise, a month-to-month tenancy can be ended by either side with 15 days’ written notice. Even after notice, a landlord cannot forcibly throw a tenant out or cut off water or electricity; eviction needs due legal process, and many states have rent control laws with extra protections.',
+    keywords: ['landlord', 'eviction', 'evict', 'tenant', 'rent', 'kiraya', 'makaan malik', 'ghar khali', 'notice', 'मकान मालिक', 'किराया', 'बेदखल'],
+  },
+  {
+    id: 'rera-31',
+    category: 'property',
+    law: 'Real Estate (Regulation and Development) Act, 2016',
+    section: 'Sections 18 and 31',
+    title: 'Delayed flat possession and RERA complaints',
+    text: 'If a builder fails to give possession as promised, the buyer may withdraw and claim a refund with interest, or stay and claim interest for each month of delay (s.18). Complaints can be filed with the state RERA authority (s.31).',
+    keywords: ['builder', 'flat', 'possession', 'rera', 'delay', 'apartment', 'बिल्डर', 'फ्लैट'],
+  },
+  // -------------------------------------------------------------- consumer
+  {
+    id: 'cpa-35',
+    category: 'consumer',
+    law: 'Consumer Protection Act, 2019',
+    section: 'Sections 34–35, 69',
+    title: 'Filing a consumer complaint',
+    text: 'Consumers can complain about defective goods, deficient services or unfair trade practices to the District Commission (claims up to ₹50 lakh), online through e-Daakhil, generally within two years of the problem. The National Consumer Helpline is 1915.',
+    keywords: ['consumer', 'refund', 'defective', 'online shopping', 'service', 'e-daakhil', 'consumer court', 'उपभोक्ता', 'रिफंड'],
+  },
+  // ------------------------------------------------------ money & cheques
+  {
+    id: 'ni-138',
+    category: 'corporate',
+    law: 'Negotiable Instruments Act, 1881',
+    section: 'Sections 138 and 142',
+    title: 'Cheque bounce',
+    text: 'If a cheque bounces for insufficient funds, the payee must send a written demand notice within 30 days of learning of the dishonour. If the drawer does not pay within 15 days of receiving it, a complaint can be filed within one month after that.',
+    keywords: ['cheque bounce', 'check bounce', 'dishonour', 'cheque', 'चेक बाउंस'],
+  },
+  {
+    id: 'wages-unpaid',
+    category: 'corporate',
+    law: 'Code on Wages, 2019',
+    section: 'Sections 17 and 45',
+    title: 'Unpaid salary',
+    text: 'Employers must pay wages on time; on resignation or termination, dues must generally be paid within two working days. Workers can file a claim with the authority appointed under the Code.',
+    keywords: ['salary', 'not paid', 'wages', 'tankhwah', 'salary nahi di', 'employer', 'वेतन', 'तनख्वाह'],
+  },
+  // ------------------------------------------------------- access to help
+  {
+    id: 'lsa-12',
+    category: 'other',
+    law: 'Legal Services Authorities Act, 1987',
+    section: 'Section 12',
+    title: 'Free legal aid',
+    text: 'Women, children, members of Scheduled Castes and Scheduled Tribes, persons in custody, persons with disabilities, victims of trafficking or disaster, industrial workmen and people below the notified income limit are entitled to a free lawyer through the Legal Services Authority. NALSA helpline: 15100.',
+    keywords: ['free lawyer', 'legal aid', 'cannot afford', 'paise nahi', 'muft vakil', 'nalsa', 'dlsa', 'मुफ्त', 'कानूनी सहायता'],
+  },
+  {
+    id: 'rti-6-7',
+    category: 'other',
+    law: 'Right to Information Act, 2005',
+    section: 'Sections 6 and 7',
+    title: 'Getting information from a government office',
+    text: 'Any citizen can request information from a public authority by paying the prescribed fee (₹10 for central bodies). A reply is due within 30 days, or within 48 hours if the information concerns someone’s life or liberty.',
+    keywords: ['rti', 'right to information', 'government office', 'information', 'सूचना का अधिकार'],
+  },
+  {
+    id: 'dpdp-rights',
+    category: 'cyber',
+    law: 'Digital Personal Data Protection Act, 2023',
+    section: 'Sections 11–14',
+    title: 'Your rights over your personal data',
+    text: 'You can ask a company holding your personal data for a summary of it, ask it to correct or erase it, withdraw consent, nominate someone to act for you, and use its grievance process before complaining to the Data Protection Board.',
+    keywords: ['data privacy', 'personal data', 'delete my data', 'data leak', 'privacy', 'डेटा'],
+  },
+  {
+    id: 'senior-maintenance',
+    category: 'family',
+    law: 'Maintenance and Welfare of Parents and Senior Citizens Act, 2007',
+    section: 'Sections 4–5',
+    title: 'Maintenance for parents and senior citizens',
+    text: 'Parents and senior citizens who cannot maintain themselves can apply to the Maintenance Tribunal for a monthly allowance from their children or relatives.',
+    keywords: ['parents', 'senior citizen', 'old age', 'maintenance', 'children not caring', 'buzurg', 'माता-पिता', 'बुजुर्ग'],
+  },
+];
+
+export const KNOWLEDGE_BY_ID = Object.fromEntries(KNOWLEDGE_BASE.map((k) => [k.id, k]));

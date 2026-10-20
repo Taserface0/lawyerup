@@ -1,0 +1,38 @@
+{
+  "name": "lawyerup",
+  "private": true,
+  "version": "0.8.5",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "start": "node server/index.js",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint .",
+    "check:i18n": "node scripts/check-i18n.mjs",
+    "eval": "node evals/run-evals.mjs",
+    "ci": "npm run lint && npm run check:i18n && npm test && npm run build"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "@anthropic-ai/sdk": "^0.135.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.3.1",
+    "vite": "^5.4.10",
+    "vitest": "^2.1.9",
+    "eslint": "^9.39.0",
+    "@eslint/js": "^9.39.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^5.2.0",
+    "globals": "^15.15.0"
+  },
+  "description": "LawyerUp \u2014 know your rights under Indian law and book verified, transparently priced lawyers.",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=18.18"
+  }
+}

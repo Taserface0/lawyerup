@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Lint
+        run: npm run lint
+      - name: i18n parity (en / hi / hinglish)
+        run: npm run check:i18n
+      - name: Unit tests
+        run: npm test
+      - name: Offline AI evals (retrieval + guardrails)
+        run: npm run eval
+      - name: Production build
+        run: npm run build
+      - name: No API key in the browser bundle
+        run: "! grep -rqE 'sk-ant-|AIza[0-9A-Za-z_-]{30}|AQ\.[0-9A-Za-z_-]{30}|x-api-key|x-goog-api-key' dist/"
