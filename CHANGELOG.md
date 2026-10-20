@@ -5,8 +5,19 @@
 - Real client accounts: a SQLite database on the server (`server/db`, Node's built-in `node:sqlite`, versioned SQL migrations) with `/api/auth` sign-up, login, logout, current user and delete-my-account. Passwords are hashed with scrypt and a per-user salt; sessions are httpOnly, SameSite=Lax cookies (7 days) stored as token hashes. Login and sign-up are rate-limited and give one generic error for a wrong email or password.
 - The browser no longer stores any password; the old mock account list is removed on first load. The same account now works from any browser that uses the same server.
 - Docker: Node 24 image, database in the `lawyerup-data` volume. Requires Node 22.13+.
-- Lawyer accounts, bookings, cases and chats are still browser-only (next phase).
 - 1 new string in all three languages (430 keys); 14 new tests (89 total).
+
+Phase 2:
+
+- Lawyers, availability, bookings and cases moved to the database (migration 002): lawyer sign-up and login (role-checked, one email = one account), the admin review of applications, slots, appointments and cases, all behind `/api/data` with access checks from the session.
+- Double-booking is impossible: booking is one `BEGIN IMMEDIATE` transaction that claims the slot only while it is still available and in the future, and `appointments.slot_id` is UNIQUE. Tested with five concurrent bookings of one slot (exactly one succeeds).
+- Case workflow enforced on the server: only the client can request resolution, only the assigned lawyer can keep a case active or close it, CLOSED is final, case numbers are max + 1.
+- Fee, lawyer name, category and date of a booking come from the server, not the browser. Approved lawyers are published without email, phone or documents.
+- The store files keep their synchronous functions, now reading a server copy that refreshes every 10 s and on focus, so the screens did not change; the old browser lists with base64 passwords are deleted on load.
+- Demo data (the demo lawyer and the demo client's two past consultations) is seeded by the server.
+- Fixed: the checkout and confirmation said "Today" whatever day the slot was on; the sign-up password hint said 6 characters while 8 are required; a lawyer whose session was restored by the server opened on the client Home screen.
+- Chat messages and reviews are still browser-only (next phase).
+- 1 new string (431 keys); 14 new server tests (`tests/data.test.js`), 105 total.
 
 ## 0.8.5 (2026-10-20)
 

@@ -1,7 +1,12 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react';
 import { loadSession, saveSession, clearSession, rememberClientProfile } from '../services/mockAuthStore.js';
 import { fetchCurrentUser, signOut } from '../services/authApi.js';
-import { seedDemoLawyerAccountIfMissing } from '../services/mockLawyerStore.js';
+import { refreshServerData, resetServerData, DATA_EVENT, DATA_ERROR_EVENT } from '../services/serverData.js';
+import { translations } from '../i18n/index.js';
+
+// How often signed-in screens re-check the server for bookings and case
+// changes made elsewhere (another browser, the other party).
+const DATA_POLL_MS = 10_000;
 
 const initialState = {
   screen: 'home', // home | chat | lawyers | bookings | profile
@@ -17,7 +22,7 @@ const initialState = {
   // (never written to localStorage — see the persistence effect below,
   // which only ever mirrors `user`), and exist purely so THIS client's own
   // Lawyers list can sort by distance. The privacy boundary is enforced at
-  // the write site, not here: mockAppointmentStore.js's createAppointment()
+  // the write site, not here: mockAppointmentStore.js's bookSlot() (and the server)
   // only accepts a `city` string, and BookingCheckoutModal.jsx only ever
   // reads `.city` off this object — the lat/lng never reaches anything
   // shared/durable (an Appointment/Case), so a lawyer can never see them.
@@ -45,6 +50,9 @@ const initialState = {
   lang: 'en', // language CODE, not display label — see src/i18n/index.js
   modal: { type: null, payload: null },
   toast: { message: '', id: 0 },
+  // Bumped whenever the server data copy (services/serverData.js) changes, so
+  // every screen re-renders and re-reads lawyers, slots, bookings and cases.
+  dataVersion: 0,
 };
 
 // NOTE: appointments/bookings are no longer part of this in-memory reducer
@@ -86,6 +94,8 @@ function reducer(state, action) {
       return { ...state, modal: { type: null, payload: null } };
     case 'SHOW_TOAST':
       return { ...state, toast: action.payload };
+    case 'DATA_SYNCED':
+      return { ...state, dataVersion: state.dataVersion + 1 };
     default:
       return state;
   }
@@ -152,24 +162,27 @@ export function AppProvider({ children }) {
 
   // Mirror the logged-in user to localStorage so the first render after a
   // refresh shows the right screen (display data only; the server cookie is
-  // what proves the session). When a client session ends, however it ended
-  // (Sign out, account deleted, switching to a lawyer login), end it on the
-  // server too, so a reload can't bring it back.
+  // what proves the session). When a session ends, however it ended (Sign
+  // out, account deleted), end it on the server too, so
+  // a reload can't bring it back, and only then reload the data.
   const previousUserRef = useRef(state.user);
   useEffect(() => {
     if (state.user) saveSession(state.user);
     else clearSession();
     const previous = previousUserRef.current;
     previousUserRef.current = state.user;
-    if (previous?.role === 'client' && state.user?.email !== previous.email) signOut().catch(() => {});
+    if (previous && !state.user) {
+      signOut()
+        .catch(() => {})
+        .finally(() => refreshServerData().catch(() => {}));
+    }
   }, [state.user]);
 
-  // Client accounts live on the server: confirm the cached profile (or pick
-  // up a session this browser doesn't have cached) and refresh it, e.g. a
-  // KYC change. Lawyer accounts are still browser-only, so they're left alone.
+  // Accounts live on the server: confirm the cached profile (or pick up a
+  // session this browser doesn't have cached) and refresh it, e.g. a KYC
+  // change or a lawyer application being approved.
   useEffect(() => {
     const cached = loadSession();
-    if (cached && cached.role !== 'client') return;
     fetchCurrentUser()
       .then((user) => {
         // Someone signed in or out while this was loading: theirs wins.
@@ -177,6 +190,9 @@ export function AppProvider({ children }) {
         if (user) {
           rememberClientProfile(user);
           dispatch({ type: 'SET_USER', payload: user });
+          // A lawyer session with nothing cached started on the client Home
+          // screen; open their dashboard instead, as init() does for a cached one.
+          if (!cached && user.role === 'lawyer') dispatch({ type: 'SET_SCREEN', payload: 'lawyerAppointments' });
         } else if (cached) dispatch({ type: 'LOGOUT' });
       })
       .catch(() => {
@@ -185,18 +201,45 @@ export function AppProvider({ children }) {
       });
   }, []);
 
+  // Lawyers, availability, bookings and cases come from the server
+  // (services/serverData.js). Re-render on every change, and show a toast
+  // when the server refuses one (the copy has already been put back).
+  const langRef = useRef(state.lang);
+  langRef.current = state.lang;
   useEffect(() => {
-    // DEV-ONLY: seed a demo lawyer account, so the lawyer side of the
-    // appointment/case/chat flow is testable without hand-registering a
-    // brand-new lawyer application first. import.meta.env.DEV is Vite's
-    // built-in flag — this is false (and the call never happens) in a real
-    // `vite build` production bundle. See the large comment on
-    // seedDemoLawyerAccountIfMissing() in mockLawyerStore.js for exactly
-    // why it's structured this way.
-    if (import.meta.env.DEV) {
-      seedDemoLawyerAccountIfMissing();
-    }
+    const onData = () => dispatch({ type: 'DATA_SYNCED' });
+    const onError = () => {
+      const message = (translations[langRef.current] || translations.en).toast.actionFailed;
+      dispatch({ type: 'SHOW_TOAST', payload: { message, id: Date.now() } });
+    };
+    window.addEventListener(DATA_EVENT, onData);
+    window.addEventListener(DATA_ERROR_EVENT, onError);
+    return () => {
+      window.removeEventListener(DATA_EVENT, onData);
+      window.removeEventListener(DATA_ERROR_EVENT, onError);
+    };
   }, []);
+
+  // Reload whenever the signed-in account changes (what you may see depends
+  // on it), then keep it fresh while the page is visible.
+  const userKey = state.user ? `${state.user.role}:${state.user.email}` : '';
+  const firstLoadRef = useRef(true);
+  useEffect(() => {
+    const refresh = () => {
+      if (document.visibilityState !== 'hidden') refreshServerData().catch(() => {});
+    };
+    // After a sign-out, the sign-out effect above reloads once the server
+    // session is gone; until then, drop the private data.
+    if (userKey || firstLoadRef.current) refresh();
+    else resetServerData();
+    firstLoadRef.current = false;
+    const timer = setInterval(refresh, DATA_POLL_MS);
+    window.addEventListener('focus', refresh);
+    return () => {
+      clearInterval(timer);
+      window.removeEventListener('focus', refresh);
+    };
+  }, [userKey]);
 
   return (
     <AppStateContext.Provider value={state}>

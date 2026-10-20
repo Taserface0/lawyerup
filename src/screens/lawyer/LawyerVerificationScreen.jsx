@@ -1,8 +1,6 @@
-import { useState } from 'react';
 import Icon from '../../icons/Icon.jsx';
 import { useAppState, useAppDispatch } from '../../context/AppContext.jsx';
 import { useTranslation } from '../../hooks/useTranslation.js';
-import { getLawyerApplicationById } from '../../services/mockLawyerStore.js';
 
 const STATUS_ICON = { submitted: 'receipt', under_review: 'receipt', approved: 'checkBig', rejected: 'alert' };
 const STATUS_CLASS = { submitted: 'review', under_review: 'pending', approved: 'approved', rejected: 'rejected' };
@@ -14,7 +12,8 @@ export default function LawyerVerificationScreen() {
 
   // Re-fetch fresh in case an admin approved/rejected since login — `user`
   // in context is just the snapshot from sign-in time.
-  const [profile] = useState(() => getLawyerApplicationById(user.id) || user);
+  // The server-backed profile; AppContext refreshes it on load (e.g. after an admin approval).
+  const profile = user;
   const status = profile.status || 'submitted';
 
   function applyAgain() {

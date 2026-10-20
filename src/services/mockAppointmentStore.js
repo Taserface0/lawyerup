@@ -1,26 +1,14 @@
 // =============================================================================
-// MOCK ONLY — Appointment data model. Replaces the old "booking = receipt"
-// behavior (a plain object pushed into in-memory AppContext state) with a
-// real, persisted lifecycle that both the client and lawyer sides of the
-// app read from.
+// Appointments (bookings). Stored in the server database
+// (server/db/practice.js) since Phase 2; this module reads the browser's copy
+// in serverData.js, which only ever contains this visitor's own bookings:
+// a client gets the appointments they made, a lawyer the ones made with them.
 //
-// STORAGE NOTE: this uses one global localStorage key
-// (`lawyerup_mock_appointments`), the same pattern as mockAuthStore.js and
-// mockLawyerStore.js. That's intentional, not an oversight: in this
-// no-backend prototype, "the client" and "the lawyer" are just two
-// different accounts signed into the SAME browser at different times, and
-// localStorage is shared across the whole origin regardless of which
-// account is currently signed in. That's exactly what makes it possible to
-// book as a client, sign out, sign in as the lawyer, and see the same
-// appointment — mirroring how a real backend's shared `appointments` table
-// would work, without actually needing one yet.
-//
-// A real backend replaces this file with a real `appointments` table, an
-// authenticated API (a client can only read their own rows; a lawyer can
-// only read rows where they're the assigned lawyer), and server-issued IDs.
+// The file keeps its old name and synchronous getters so the screens that
+// read appointments did not have to change.
 // =============================================================================
 
-const APPOINTMENTS_KEY = 'lawyerup_mock_appointments';
+import { serverData, patchServerData, mutate } from './serverData.js';
 
 export const APPOINTMENT_STATUS = {
   REQUESTED: 'REQUESTED',
@@ -31,111 +19,46 @@ export const APPOINTMENT_STATUS = {
   CANCELLED: 'CANCELLED',
 };
 
-function readAppointments() {
-  try {
-    const raw = localStorage.getItem(APPOINTMENTS_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeAppointments(list) {
-  localStorage.setItem(APPOINTMENTS_KEY, JSON.stringify(list));
-}
+const newestFirst = (a, b) => new Date(b.createdAt) - new Date(a.createdAt);
 
 /**
- * Creates a new appointment. Booking currently confirms immediately (no
- * lawyer accept/reject step yet — that's a natural Phase-4/5-adjacent
- * extension, not implemented here), so status starts at CONFIRMED.
+ * Books an availability slot for the signed-in client. The server claims the
+ * slot and creates the Appointment and its Case in one transaction, so two
+ * clients can never both get the same slot. Fee, lawyer name and date come
+ * from the server, not the browser.
  *
- * @param {object} params
- * @param {string} params.clientId - the client's email (stable identifier
- *   already used as the account key in mockAuthStore.js)
- * @param {number} params.lawyerId - matches the unified id space from
- *   getAllMarketplaceLawyers()/findMarketplaceLawyerById()
- * @param {string} params.lawyerName
- * @param {string} params.categorySlug
- * @param {'online'|'in_person'} params.consultationType
- * @param {string} params.date
- * @param {string} params.time
- * @param {string|null} params.city - resolved city name ONLY. Never pass
- *   raw coordinates here — see mockLocationService.js's privacy note.
- * @param {number} params.fee
- * @param {number} params.platformFee
- * @param {string|null} params.caseSummary
+ * @param {{ slotId: string, city?: string|null, caseSummary?: string|null }} booking
+ *   city: resolved city NAME only, never coordinates (see mockLocationService.js)
+ * @returns {Promise<{ appointment: object, case: object }>}
+ * @throws {Error} 'slot-unavailable' when the slot was just taken or has passed,
+ *   'lawyer-not-bookable', 'clients-only', 'network', ...
  */
-export function createAppointment({
-  clientId,
-  lawyerId,
-  lawyerName,
-  categorySlug,
-  consultationType,
-  date,
-  time,
-  city,
-  fee,
-  platformFee,
-  caseSummary,
-  status = APPOINTMENT_STATUS.CONFIRMED, // override used only by demo-data seeding
-  createdAt = new Date().toISOString(), // override used only by demo-data seeding
-}) {
-  const appointments = readAppointments();
-  const appointment = {
-    appointmentId: `apt_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-    clientId,
-    lawyerId,
-    lawyerName,
-    categorySlug,
-    consultationType, // 'online' | 'in_person'
-    date,
-    time,
-    city: city || null, // city name only — never raw lat/lng
-    fee,
-    platformFee,
-    caseSummary: caseSummary || null,
-    status,
-    createdAt,
-  };
-  appointments.unshift(appointment);
-  writeAppointments(appointments);
-  return appointment;
+export async function bookSlot({ slotId, city = null, caseSummary = null }) {
+  const result = await mutate('bookings', { slotId, city, caseSummary });
+  return { appointment: result.appointment, case: result.case };
 }
 
 export function getAppointmentsForClient(clientId) {
-  return readAppointments()
-    .filter((a) => a.clientId === clientId)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return serverData()
+    .appointments.filter((a) => a.clientId === clientId)
+    .sort(newestFirst);
 }
 
 export function getAppointmentsForLawyer(lawyerId) {
-  return readAppointments()
-    .filter((a) => a.lawyerId === lawyerId)
-    .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+  return serverData()
+    .appointments.filter((a) => a.lawyerId === lawyerId)
+    .sort(newestFirst);
 }
 
 export function getAppointmentById(appointmentId) {
-  return readAppointments().find((a) => a.appointmentId === appointmentId) || null;
-}
-
-export function updateAppointmentStatus(appointmentId, status) {
-  const appointments = readAppointments();
-  const idx = appointments.findIndex((a) => a.appointmentId === appointmentId);
-  if (idx === -1) return null;
-  appointments[idx] = { ...appointments[idx], status };
-  writeAppointments(appointments);
-  return appointments[idx];
+  return serverData().appointments.find((a) => a.appointmentId === appointmentId) || null;
 }
 
 /**
- * DEV-ONLY: deletes every appointment belonging to one client (matched by
- * exact clientId — never a prefix/partial match). Used by
- * mockAuthStore.js's deleteClientDataLocally() — always run this
- * AFTER that client's cases (and their messages) have already been
- * deleted, and BEFORE deleting the account itself.
+ * Drops one client's appointments from the browser's copy after the server
+ * has deleted their account (the server already deleted the rows). Used by
+ * mockAuthStore.js's deleteClientDataLocally().
  */
 export function deleteAppointmentsForClient(clientId) {
-  const appointments = readAppointments();
-  const remaining = appointments.filter((a) => a.clientId !== clientId);
-  writeAppointments(remaining);
+  patchServerData({ appointments: serverData().appointments.filter((a) => a.clientId !== clientId) });
 }

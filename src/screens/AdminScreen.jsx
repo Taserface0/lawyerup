@@ -3,12 +3,15 @@ import Icon from '../icons/Icon.jsx';
 import { initials } from '../lib/utils.js';
 import { useAppState, useAppDispatch } from '../context/AppContext.jsx';
 import { useTranslation } from '../hooks/useTranslation.js';
-import {
-  getAllLawyerApplications,
-  updateLawyerApplicationStatus,
-} from '../services/mockLawyerStore.js';
 import { deleteClientDataLocally } from '../services/mockAuthStore.js';
-import { adminListClients, adminSetKycStatus, adminDeleteClient } from '../services/authApi.js';
+import {
+  adminListClients,
+  adminSetKycStatus,
+  adminDeleteClient,
+  adminListLawyers,
+  adminSetLawyerStatus,
+} from '../services/authApi.js';
+import { refreshServerData } from '../services/serverData.js';
 
 const LAWYER_FILTERS = ['all', 'submitted', 'under_review', 'approved', 'rejected'];
 
@@ -17,7 +20,7 @@ export default function AdminScreen() {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const [applications, setApplications] = useState(() => getAllLawyerApplications());
+  const [applications, setApplications] = useState([]); // loaded from the server below
   const [clientAccounts, setClientAccounts] = useState([]); // loaded from the server below
   const [filter, setFilter] = useState('all');
   const [rejectingId, setRejectingId] = useState(null);
@@ -25,7 +28,17 @@ export default function AdminScreen() {
   const [deletingEmail, setDeletingEmail] = useState(null); // dev-only delete confirmation state
 
   function refreshApplications() {
-    setApplications(getAllLawyerApplications());
+    adminListLawyers()
+      .then(setApplications)
+      .catch(() => {});
+  }
+  useEffect(refreshApplications, []);
+  // An approval changes the marketplace, so reload that too.
+  function setLawyerStatus(id, status, reason) {
+    adminSetLawyerStatus(id, status, reason).then(() => {
+      refreshApplications();
+      refreshServerData().catch(() => {});
+    }, () => {});
   }
   function refreshClients() {
     adminListClients()
@@ -35,23 +48,20 @@ export default function AdminScreen() {
   useEffect(refreshClients, []);
 
   function handleStartReview(id) {
-    updateLawyerApplicationStatus(id, 'under_review');
-    refreshApplications();
+    setLawyerStatus(id, 'under_review');
   }
   function handleApprove(id) {
-    updateLawyerApplicationStatus(id, 'approved');
-    refreshApplications();
+    setLawyerStatus(id, 'approved');
   }
   function handleReset(id) {
-    updateLawyerApplicationStatus(id, 'under_review');
-    refreshApplications();
+    setLawyerStatus(id, 'under_review');
   }
   function openRejectBox(id) {
     setRejectingId(id);
     setRejectionDraft('');
   }
   function confirmReject(id) {
-    updateLawyerApplicationStatus(id, 'rejected', rejectionDraft.trim() || t('admin.defaultRejectionReason'));
+    setLawyerStatus(id, 'rejected', rejectionDraft.trim() || t('admin.defaultRejectionReason'));
     setRejectingId(null);
     refreshApplications();
   }

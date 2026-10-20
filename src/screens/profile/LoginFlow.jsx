@@ -6,7 +6,6 @@ import { useTranslation } from '../../hooks/useTranslation.js';
 import { isValidEmail } from '../../lib/utils.js';
 import { DEMO_EMAIL, DEMO_PASSWORD, rememberClientProfile } from '../../services/mockAuthStore.js';
 import { signIn } from '../../services/authApi.js';
-import { seedDemoConsultationsIfMissing } from '../../data/demoUser.js';
 
 export default function LoginFlow() {
   const dispatch = useAppDispatch();
@@ -40,9 +39,6 @@ export default function LoginFlow() {
 
     rememberClientProfile(profile);
     dispatch({ type: 'SET_USER', payload: profile });
-    if (profile.email.toLowerCase() === DEMO_EMAIL.toLowerCase()) {
-      seedDemoConsultationsIfMissing(profile.email);
-    }
     showToast(t('toast.welcomeBackToast', { name: profile.firstName || profile.name.split(' ')[0] }));
   }
 

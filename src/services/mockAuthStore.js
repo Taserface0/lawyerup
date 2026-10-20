@@ -8,13 +8,12 @@
 //    app can render the right screen instantly on reload. It is display data
 //    only; AppContext re-checks it with the server (/api/auth/me), and the
 //    httpOnly cookie is what actually proves who you are.
-//  - A small directory of client profiles seen in this browser
-//    (rememberClientProfile/getClientAccountByEmail). Appointments, cases and
-//    messages are still browser-only until they move to the database too, and
-//    the lawyer screens use this to show a client's name and phone next to
-//    their bookings, exactly as before.
-//  - deleteClientDataLocally(): removes that browser-only data for a client
-//    when their account is deleted.
+//  - getClientAccountByEmail(): a client's name and phone for the lawyer
+//    screens. The server sends a lawyer the profiles of their own clients;
+//    profiles seen in this browser (rememberClientProfile) are the fallback.
+//  - deleteClientDataLocally(): after the server deleted an account, removes
+//    it from the browser's copy of the data, plus its messages and reviews,
+//    which are still browser-only.
 // =============================================================================
 
 // Pulled in only for deleteClientDataLocally(). No circular import risk:
@@ -23,6 +22,7 @@ import { getCasesForClient, deleteCasesForClient } from './mockCaseStore.js';
 import { deleteAppointmentsForClient } from './mockAppointmentStore.js';
 import { deleteMessagesForCase } from './mockMessageStore.js';
 import { anonymiseReviewsForClient } from './mockReviewStore.js';
+import { serverData } from './serverData.js';
 
 const PROFILES_KEY = 'lawyerup_client_profiles';
 const SESSION_KEY = 'lawyerup_mock_session';
@@ -62,9 +62,14 @@ export function rememberClientProfile(profile) {
   writeProfiles([...others, { id, role, firstName, lastName, name, phone, email, city, kycStatus }]);
 }
 
-/** The cached display profile for a client email, if this browser has seen it. */
+/**
+ * A client's display profile: from the server (a lawyer gets the profiles of
+ * the clients who booked them), else from this browser's cache.
+ */
 export function getClientAccountByEmail(email) {
-  return readProfiles().find((p) => sameEmail(p.email, email)) || null;
+  return (
+    serverData().clients.find((p) => sameEmail(p.email, email)) || readProfiles().find((p) => sameEmail(p.email, email)) || null
+  );
 }
 
 function forgetClientProfile(email) {

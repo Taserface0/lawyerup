@@ -1,5 +1,5 @@
 // =============================================================================
-// Client accounts and login, backed by the server (server/auth/handler.js)
+// Client and lawyer accounts and login, backed by the server (server/auth/handler.js)
 // and its database. The browser never stores a password; the session is an
 // httpOnly cookie the page cannot read.
 //
@@ -35,9 +35,20 @@ export async function signUp({ firstName, lastName, phone, email, city, password
   return (await request('/api/auth/signup', { method: 'POST', body: { firstName, lastName, phone, email, city, password, kycStatus } })).user;
 }
 
-/** @returns {Promise<object>} the profile; throws 'invalid-credentials' on a wrong email or password. */
-export async function signIn(email, password) {
-  return (await request('/api/auth/login', { method: 'POST', body: { email, password } })).user;
+/**
+ * Submits a lawyer application (status 'submitted'); the lawyer is signed in afterwards.
+ * @returns {Promise<object>} the lawyer's application profile (id is the numeric lawyer id)
+ */
+export async function lawyerSignUp(application) {
+  return (await request('/api/auth/lawyer-signup', { method: 'POST', body: application })).user;
+}
+
+/**
+ * @param {'client'|'lawyer'} [role] which sign-in form is used; the other kind of account is refused
+ * @returns {Promise<object>} the profile; throws 'invalid-credentials' on a wrong email or password.
+ */
+export async function signIn(email, password, role = 'client') {
+  return (await request('/api/auth/login', { method: 'POST', body: { email, password, role } })).user;
 }
 
 export async function signOut() {
@@ -69,4 +80,12 @@ export async function adminSetKycStatus(email, kycStatus) {
 
 export async function adminDeleteClient(email) {
   await request('/api/auth/admin/delete', { method: 'POST', body: { email } });
+}
+
+export async function adminListLawyers() {
+  return (await request('/api/auth/admin/lawyers')).lawyers;
+}
+
+export async function adminSetLawyerStatus(id, status, rejectionReason = null) {
+  return (await request('/api/auth/admin/lawyer-status', { method: 'POST', body: { id, status, rejectionReason } })).lawyer;
 }

@@ -16,6 +16,7 @@ services:
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-}
       SEED_DEMO_ACCOUNT: ${SEED_DEMO_ACCOUNT:-}
+      SEED_DEMO_LAWYER: ${SEED_DEMO_LAWYER:-}
     # Accounts database (SQLite). Kept in a named volume so it survives
     # rebuilds; `docker compose down -v` deletes it.
     volumes:

@@ -19,17 +19,17 @@ function chatApiPlugin(env) {
       const { createTtsMiddleware } = await import('./server/tts.js');
       const tts = createTtsMiddleware({ env });
       server.middlewares.use('/api/tts', (req, res) => tts(req, res));
-      // Accounts and login (SQLite in data/, or DB_PATH). The mock admin
-      // console is always on in dev, so its routes are too.
+      // Accounts, lawyers, bookings and cases (SQLite in data/, or DB_PATH).
+      // The mock admin console and the demo lawyer are always on in dev.
       const { createAuthMiddleware } = await import('./server/auth/handler.js');
+      const { createDataMiddleware } = await import('./server/data/handler.js');
       const { openDatabase } = await import('./server/db/index.js');
-      const auth = createAuthMiddleware({
-        // Vitest also starts this server; keep its database in memory.
-        db: openDatabase(env.DB_PATH || (process.env.VITEST ? ':memory:' : undefined)),
-        adminRoutes: true,
-        seedDemo: env.SEED_DEMO_ACCOUNT !== 'false',
-      });
+      // Vitest also starts this server; keep its database in memory.
+      const db = openDatabase(env.DB_PATH || (process.env.VITEST ? ':memory:' : undefined));
+      const auth = createAuthMiddleware({ db, adminRoutes: true, seedDemo: env.SEED_DEMO_ACCOUNT !== 'false', seedDemoLawyer: true });
+      const data = createDataMiddleware({ db, ready: auth.ready });
       server.middlewares.use('/api/auth', (req, res) => auth(req, res));
+      server.middlewares.use('/api/data', (req, res) => data(req, res));
     },
   };
 }

@@ -6,7 +6,7 @@ import { useAppDispatch } from '../../context/AppContext.jsx';
 import { useShowToast } from '../../hooks/useToast.js';
 import { useTranslation } from '../../hooks/useTranslation.js';
 import { isValidEmail, isValidMobile, isValidPassword } from '../../lib/utils.js';
-import { lawyerEmailIsRegistered, submitLawyerApplication } from '../../services/mockLawyerStore.js';
+import { isEmailAvailable, lawyerSignUp } from '../../services/authApi.js';
 
 const EMPTY_FORM = {
   firstName: '',
@@ -49,7 +49,6 @@ export default function LawyerJoinFlow() {
     else if (!isValidMobile(form.phone)) errors.phone = t('register.errors.mobileInvalid');
     if (!form.email.trim()) errors.email = t('register.errors.emailRequired');
     else if (!isValidEmail(form.email)) errors.email = t('register.errors.emailInvalid');
-    else if (lawyerEmailIsRegistered(form.email)) errors.email = t('toast.emailInUse');
     if (!form.city.trim()) errors.city = t('register.errors.cityRequired');
     if (!isValidPassword(form.password)) errors.password = t('register.errors.passwordTooShort');
     else if (form.password !== form.confirmPassword) errors.confirmPassword = t('register.errors.passwordsMismatch');
@@ -63,17 +62,27 @@ export default function LawyerJoinFlow() {
     return errors;
   }
 
-  function handleFormSubmit(e) {
+  async function handleFormSubmit(e) {
     e.preventDefault();
     const errors = validateForm();
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
+    // Checked on the server before the documents step; submitting checks again.
+    try {
+      if (!(await isEmailAvailable(form.email))) {
+        setFieldErrors({ email: t('toast.emailInUse') });
+        return;
+      }
+    } catch {
+      showToast(t('toast.serverUnavailable'));
+      return;
+    }
     setStep('documents');
   }
 
-  function handleSubmitApplication() {
+  async function handleSubmitApplication() {
     try {
-      const profile = submitLawyerApplication({
+      const profile = await lawyerSignUp({
         firstName: form.firstName.trim(),
         lastName: form.lastName.trim(),
         phone: form.phone.trim(),
@@ -96,9 +105,11 @@ export default function LawyerJoinFlow() {
       setCreatedProfile(profile);
       setStep('submitted');
       showToast(t('toast.applicationSubmitted'));
-    } catch {
-      setFieldErrors({ email: t('toast.emailInUse') });
-      setStep('form');
+    } catch (err) {
+      if (err.message === 'email-in-use') {
+        setFieldErrors({ email: t('toast.emailInUse') });
+        setStep('form');
+      } else showToast(t('toast.serverUnavailable'));
     }
   }
 

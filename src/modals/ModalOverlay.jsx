@@ -35,6 +35,7 @@ export default function ModalOverlay() {
         return (
           <BookingConfirmModal
             lawyerName={modal.payload.lawyerName}
+            date={modal.payload.date}
             slot={modal.payload.slot}
             caseId={modal.payload.caseId}
           />

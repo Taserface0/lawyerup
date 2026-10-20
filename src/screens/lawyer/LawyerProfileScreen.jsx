@@ -1,16 +1,15 @@
-import { useState } from 'react';
 import Icon from '../../icons/Icon.jsx';
 import { initials } from '../../lib/utils.js';
 import { useAppState, useAppDispatch } from '../../context/AppContext.jsx';
 import { useTranslation } from '../../hooks/useTranslation.js';
-import { getLawyerApplicationById } from '../../services/mockLawyerStore.js';
 
 export default function LawyerProfileScreen() {
   const { user } = useAppState();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
-  const [profile] = useState(() => getLawyerApplicationById(user.id) || user);
+  // The server-backed profile; AppContext refreshes it on load (e.g. after an admin approval).
+  const profile = user;
 
   return (
     <div className="screen active">

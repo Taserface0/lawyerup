@@ -20,6 +20,8 @@ RUN npm ci --omit=dev && npm cache clean --force
 
 COPY --chown=node:node server ./server
 COPY --chown=node:node src/ai ./src/ai
+# The static marketplace listing: the server checks fees and bookability against it.
+COPY --chown=node:node src/data ./src/data
 COPY --from=build --chown=node:node /app/dist ./dist
 # The SQLite database lives here; docker-compose mounts a volume on it.
 RUN mkdir -p /app/data && chown node:node /app/data

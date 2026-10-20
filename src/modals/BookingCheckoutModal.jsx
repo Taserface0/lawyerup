@@ -1,13 +1,7 @@
 import { useState } from 'react';
 import { findMarketplaceLawyerById } from '../services/mockLawyerStore.js';
-import { createAppointment } from '../services/mockAppointmentStore.js';
-import { createCaseForAppointment } from '../services/mockCaseStore.js';
-import {
-  claimAvailabilitySlot,
-  attachAppointmentToSlot,
-  getSlotById,
-  formatSlotDateForRecord,
-} from '../services/mockAvailabilityStore.js';
+import { bookSlot } from '../services/mockAppointmentStore.js';
+import { getSlotById, formatSlotDateForRecord } from '../services/mockAvailabilityStore.js';
 import { useAppState, useAppDispatch } from '../context/AppContext.jsx';
 import { useShowToast } from '../hooks/useToast.js';
 import { useTranslation } from '../hooks/useTranslation.js';
@@ -20,58 +14,47 @@ export default function BookingCheckoutModal({ lawyerId, slotId, slotLabel, cons
   const showToast = useShowToast();
   const { t } = useTranslation();
   const [caseSummary, setCaseSummary] = useState('');
+  const [paying, setPaying] = useState(false);
 
   const lawyer = findMarketplaceLawyerById(lawyerId);
   if (!lawyer) return null;
 
   const modeLabel = consultationType === 'in_person' ? t('consultation.inPerson') : t('consultation.online');
+  // The slot's real date: this line used to say "Today" whatever day was booked.
+  const slot = getSlotById(slotId);
+  const dateLabel = slot ? formatSlotDateForRecord(slot.date) : '';
 
-  function handlePay() {
+  async function handlePay() {
+    if (paying) return;
     if (user?.role !== 'client') {
       showToast(t('toast.lawyerCannotBook'));
       dispatch({ type: 'CLOSE_MODAL' });
       return;
     }
-    // Read the slot's date before claiming it. The appointment used to be
-    // saved with date: 'Today' regardless of the slot, so a booking for next
-    // week showed as "Today" in Bookings and on the lawyer's dashboard.
-    const slot = getSlotById(slotId);
-    // Claim the slot FIRST, before creating anything — if this fails (someone
-    // else booked it a moment ago, or it slipped into the past while this
-    // checkout screen was open), no Appointment/Case is ever created for a
-    // slot we don't actually hold. See mockAvailabilityStore.js's header
-    // comment for exactly what this claim does and doesn't guarantee.
-    const claimed = claimAvailabilitySlot(slotId);
-    if (!claimed) {
-      showToast(t('availability.slotTaken'));
-      dispatch({ type: 'CLOSE_MODAL' });
+    // The server claims the slot and creates the Appointment and its Case
+    // (two separate records on purpose, see services/mockCaseStore.js) in
+    // one transaction. If someone else booked the slot a moment ago, or it
+    // slipped into the past while this screen was open, nothing is created.
+    // The date, fee and lawyer name are taken from the server's records.
+    let newCase;
+    let appointment;
+    setPaying(true);
+    try {
+      ({ case: newCase, appointment } = await bookSlot({
+        slotId,
+        city, // city NAME only — never coordinates, see mockLocationService.js
+        caseSummary: caseSummary.trim() || null,
+      }));
+    } catch (err) {
+      setPaying(false);
+      showToast(t(err.message === 'slot-unavailable' ? 'availability.slotTaken' : 'toast.actionFailed'));
+      if (err.message === 'slot-unavailable') dispatch({ type: 'CLOSE_MODAL' });
       return;
     }
 
-    // Appointment first (the booking itself), then a Case that references
-    // it — kept as two separate records on purpose: a client may need a
-    // second, unrelated appointment with the same lawyer later, and that
-    // must become its OWN case with its OWN chat, never merged into this
-    // one. See services/mockCaseStore.js.
-    const appointment = createAppointment({
-      clientId: user.email,
-      lawyerId: lawyer.id,
-      lawyerName: lawyer.name,
-      categorySlug: lawyer.cats[0],
-      consultationType,
-      date: slot ? formatSlotDateForRecord(slot.date) : '—',
-      time: slotLabel,
-      city, // city NAME only — never coordinates, see mockLocationService.js
-      fee: lawyer.fee,
-      platformFee: PLATFORM_FEE,
-      caseSummary: caseSummary.trim() || null,
-    });
-    attachAppointmentToSlot(slotId, appointment.appointmentId);
-    const newCase = createCaseForAppointment(appointment);
-
     dispatch({
       type: 'OPEN_MODAL',
-      payload: { type: 'bookingConfirm', payload: { lawyerName: lawyer.name, slot: slotLabel, caseId: newCase.caseId } },
+      payload: { type: 'bookingConfirm', payload: { lawyerName: lawyer.name, date: appointment.date, slot: slotLabel, caseId: newCase.caseId } },
     });
     showToast(t('toast.bookingSuccess'));
   }
@@ -86,7 +69,7 @@ export default function BookingCheckoutModal({ lawyerId, slotId, slotLabel, cons
       <div className="bio-text" style={{ marginBottom: 6 }}>
         <b>{lawyer.name}</b>
         <br />
-        {t('booking.summaryLine', { slot: slotLabel, mode: modeLabel })}
+        {t('booking.summaryLine', { date: dateLabel, slot: slotLabel, mode: modeLabel })}
         {consultationType === 'in_person' && city && (
           <>
             <br />
@@ -126,7 +109,7 @@ export default function BookingCheckoutModal({ lawyerId, slotId, slotLabel, cons
         }}
       />
 
-      <button className="book-btn" onClick={handlePay}>
+      <button className="book-btn" onClick={handlePay} disabled={paying}>
         {t('booking.payButton', { amount: lawyer.fee + PLATFORM_FEE })}
       </button>
       <p style={{ textAlign: 'center', fontSize: 11, color: 'var(--ink-faint)', marginTop: 10 }}>

@@ -2,7 +2,7 @@ import Icon from '../icons/Icon.jsx';
 import { useAppDispatch } from '../context/AppContext.jsx';
 import { useTranslation } from '../hooks/useTranslation.js';
 
-export default function BookingConfirmModal({ lawyerName, slot, caseId }) {
+export default function BookingConfirmModal({ lawyerName, date, slot, caseId }) {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
 
@@ -30,7 +30,7 @@ export default function BookingConfirmModal({ lawyerName, slot, caseId }) {
         {t('booking.confirmedTitle')}
       </h2>
       <p style={{ textAlign: 'center', color: 'var(--ink-soft)', fontSize: 13.5, margin: '0 0 22px' }}>
-        {t('booking.confirmedLine', { lawyerName, slot })}
+        {t('booking.confirmedLine', { lawyerName, date, slot })}
         <br />
         {t('booking.whatsappNote')}
       </p>
