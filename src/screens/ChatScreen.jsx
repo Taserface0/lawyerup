@@ -77,6 +77,8 @@ export default function ChatScreen() {
           <button
             type="button"
             className="icon-btn call-btn"
+            // A question spoken while a reply is loading is dropped by sendMessage, leaving the call stuck on "thinking".
+            disabled={chatBusy}
             onClick={() => {
               tts.cancel();
               setInCall(true);

@@ -180,7 +180,13 @@ export function useSpeechSynthesis({ lang }) {
     if (browserTts) window.speechSynthesis.cancel();
   }, [browserTts]);
 
-  useEffect(() => () => stopAll(), [stopAll]);
+  useEffect(
+    () => () => {
+      runRef.current += 1; // an answer still loading must not fall back to the browser voice after unmount
+      stopAll();
+    },
+    [stopAll]
+  );
 
   /** speak(text, { onEnd }): onEnd fires once, after the last sentence or on cancel/error. */
   const speak = useCallback(
