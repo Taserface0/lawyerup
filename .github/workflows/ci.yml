@@ -26,4 +26,5 @@ jobs:
       - name: Production build
         run: npm run build
       - name: No API key in the browser bundle
-        run: "! grep -rqE 'sk-ant-|AIza[0-9A-Za-z_-]{30}|AQ\.[0-9A-Za-z_-]{30}|x-api-key|x-goog-api-key' dist/"
+        run: |
+          ! grep -rqE 'sk-ant-|AIza[0-9A-Za-z_-]{30}|AQ\.[0-9A-Za-z_-]{30}|x-api-key|x-goog-api-key' dist/
