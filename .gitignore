@@ -7,3 +7,7 @@ dist
 evals/results/
 coverage/
 *.log
+.env.*
+!.env.example
+*.wav
+*.zip
