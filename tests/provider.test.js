@@ -101,15 +101,15 @@ describe('Gemini adapter', () => {
     const fetchImpl = vi.fn(async () => ({ ok: false, status: 429, json: async () => ({ error: { message: 'quota' } }) }));
     const call = createGeminiMessageFn('k', { fetchImpl, sleep: async () => {}, log: () => {} });
     await expect(call({ messages: [{ role: 'user', content: 'x' }], max_tokens: 10 })).rejects.toMatchObject({ status: 429 });
-    // 2 attempts on each of: main model + the non-duplicate fallback
-    expect(fetchImpl).toHaveBeenCalledTimes(4);
+    // 1 attempt on each of: main model + the non-duplicate fallback
+    expect(fetchImpl).toHaveBeenCalledTimes(2);
   });
 
   const OK = { ok: true, json: async () => ({ candidates: [{ finishReason: 'STOP', content: { parts: [{ text: '{}' }] } }] }) };
   const fail = (status, message = '') => ({ ok: false, status, json: async () => ({ error: { message } }) });
   const modelOf = (url) => url.match(/models\/([^:]+)/)[1];
 
-  it('retries an overloaded model, then falls back to the next one', async () => {
+  it('falls back to the next model as soon as one is overloaded', async () => {
     const calls = [];
     const fetchImpl = vi.fn(async (url) => {
       calls.push(modelOf(url));
@@ -117,7 +117,7 @@ describe('Gemini adapter', () => {
     });
     const call = createGeminiMessageFn('k', { model: 'gemini-3.8-flash', fetchImpl, sleep: async () => {}, log: () => {} });
     const out = await call({ messages: [{ role: 'user', content: 'x' }], max_tokens: 10 });
-    expect(calls).toEqual(['gemini-3.8-flash', 'gemini-3.8-flash', 'gemini-flash-latest']);
+    expect(calls).toEqual(['gemini-3.8-flash', 'gemini-flash-latest']);
     expect(out.model).toBe('gemini-flash-latest');
   });
 
@@ -128,7 +128,7 @@ describe('Gemini adapter', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1);
   });
 
-  it('sends a low thinking level, and drops it if the model rejects it', async () => {
+  it('sends a minimal thinking level, and drops it if the model rejects it', async () => {
     const bodies = [];
     const fetchImpl = vi.fn(async (url, init) => {
       const body = JSON.parse(init.body);
@@ -138,7 +138,7 @@ describe('Gemini adapter', () => {
     const call = createGeminiMessageFn('k', { fetchImpl, sleep: async () => {} });
     await call({ messages: [{ role: 'user', content: 'x' }], max_tokens: 10 });
     await call({ messages: [{ role: 'user', content: 'y' }], max_tokens: 10 });
-    expect(bodies).toEqual([{ thinkingLevel: 'low' }, undefined, undefined]);
+    expect(bodies).toEqual([{ thinkingLevel: 'minimal' }, undefined, undefined]);
   });
 
   it('runs the full chat pipeline with guardrails and citation grounding', async () => {

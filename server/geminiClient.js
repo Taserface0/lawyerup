@@ -95,7 +95,7 @@ export function createGeminiMessageFn(
   {
     model = DEFAULT_GEMINI_MODEL,
     fallbackModels = DEFAULT_GEMINI_FALLBACKS,
-    thinkingLevel = 'low',
+    thinkingLevel = 'minimal',
     fetchImpl = fetch,
     log = console.warn,
     sleep = (ms) => new Promise((r) => setTimeout(r, ms)),
@@ -104,8 +104,8 @@ export function createGeminiMessageFn(
 ) {
   let preferredModel = model;
   // Current Gemini models "think" before answering by default, which made
-  // short chat replies take 40+ seconds. A low thinking level keeps chat and
-  // voice responsive; models that reject the setting are retried without it.
+  // short chat replies take 40+ seconds. The minimal thinking level keeps chat
+  // and voice responsive; models that reject the setting are retried without it.
   let useThinking = Boolean(thinkingLevel);
 
   async function call(params, modelId) {
@@ -165,6 +165,9 @@ export function createGeminiMessageFn(
             break; // next model
           }
           if (!RETRYABLE.has(err.status)) throw err; // bad key, bad request: retrying won't help
+          // Overloaded, out of quota or timed out: waiting and asking the same
+          // model again rarely helps, so try the next model straight away.
+          if (err.status !== 500) break;
           if (now() + 1000 * attempt > deadline) throw err;
           if (attempt < ATTEMPTS_PER_MODEL) await sleep(1000 * attempt);
         }

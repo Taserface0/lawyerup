@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
+import { Readable } from 'node:stream';
 import { pcmToWav, pickTtsModel, createTtsSynthesizer, createTtsMiddleware } from '../server/tts.js';
 import { pickBrowserVoice } from '../src/hooks/useVoice.js';
 
@@ -49,6 +50,18 @@ describe('Gemini speech', () => {
     const mw = createTtsMiddleware({ env: {} });
     const res = { setHeader() {}, end: vi.fn() };
     await mw({ method: 'POST', headers: {}, socket: {} }, res);
+    expect(res.statusCode).toBe(503);
+  });
+
+  it('answers 503 when the daily speech quota is used up, so the browser stops asking', async () => {
+    const synthesize = async () => {
+      throw Object.assign(new Error('Gemini TTS 429: quota'), { status: 429 });
+    };
+    const mw = createTtsMiddleware({ env: {}, synthesize });
+    const req = Object.assign(Readable.from([Buffer.from('{"text":"Hello"}')]), { method: 'POST', headers: {}, socket: {} });
+    const res = { setHeader() {}, end: vi.fn() };
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    await mw(req, res);
     expect(res.statusCode).toBe(503);
   });
 });

@@ -120,7 +120,9 @@ export function createTtsMiddleware({ env = process.env, synthesize, rateLimit =
       res.end(wav);
     } catch (err) {
       console.error(JSON.stringify({ event: 'tts_error', status: err?.status, message: err?.message }));
-      sendJson(res, 502, { error: 'tts-failed' });
+      // Out of quota for the day: 503 tells the browser to stop asking and use its own voice.
+      if (err?.status === 429) sendJson(res, 503, { error: 'tts-quota' });
+      else sendJson(res, 502, { error: 'tts-failed' });
     }
   };
 }
