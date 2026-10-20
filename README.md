@@ -82,7 +82,7 @@ The guardrails, statute retrieval, citation checks and logs work the same with e
 | `npm run lint` | ESLint (React + hooks rules) |
 | `npm run check:i18n` | Fails unless `en`, `hi`, `hinglish` have identical keys and placeholders |
 | `npm run eval` | Offline AI evals: retrieval and guardrails (free, runs in CI) |
-| `npm run eval -- --live` | Full AI evals against the provider in `.env` (about 28 requests) |
+| `npm run eval -- --live` | Full AI evals against the provider in `.env` (about 29 requests) |
 | `npm run ci` | Everything CI runs |
 
 On macOS or Linux use `cp .env.example .env` in step 5.
@@ -124,7 +124,7 @@ browser ──POST /api/chat──▶ sanitize ▶ redact PII ▶ retrieve statu
 - **Two providers.** `AI_PROVIDER=gemini` (free key) or `anthropic`. A small adapter (`server/geminiClient.js`) translates the same request and response, so every guardrail applies to both.
 - **Prompt caching.** The system prompt is frozen and marked `cache_control` (Claude). Per-request data (sources, language) goes in the user turn so the cached prefix stays intact.
 - **Observability.** One JSON log line per turn: latency, tokens (including cache reads and writes), retrieved and cited ids, dropped citations, redaction types, crisis flags. Message text is never logged.
-- **Evals.** `evals/cases.json` holds 28 golden cases across the three languages, including injection, off-topic, PII and emergency cases.
+- **Evals.** `evals/cases.json` holds 29 golden cases across the three languages, including injection, off-topic, PII and emergency cases.
 - **Voice.** Speech-to-text (`en-IN` / `hi-IN`) and read-aloud through the browser's Web Speech API. A spoken question gets a spoken answer.
 - **Voice call.** The phone button in the chat header opens a hands-free call: speak, hear the answer, and it listens again. Tap the circle to interrupt, pause the mic, or end the call. Every turn goes through the same server guardrails, crisis questions show the helplines on the call screen, and the conversation stays in the chat. Works in Chrome and Edge (desktop and Android); the button is hidden where the browser can't do speech.
 

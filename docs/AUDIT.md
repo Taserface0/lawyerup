@@ -51,7 +51,7 @@ Severity: **Critical**: data or money at risk, or legal exposure. **High**: a us
 | A1 | Answers were ungrounded: the model was told "don't fabricate sections", with no source material and no check. | Retrieval over a curated statute knowledge base, citations restricted to retrieved passages, and hallucinated ids dropped and logged. |
 | A2 | Personal data (Aadhaar, PAN, phone, cards) was sent to a third-party model verbatim. | Redacted server-side before the request; the user sees a privacy note. |
 | A3 | Emergency handling relied entirely on the model. | Deterministic crisis detection (en/hi/Hinglish) shows helplines instantly in the browser and forces high urgency server-side. |
-| A4 | No way to measure answer quality. | 28-case golden eval set (offline in CI; live mode for model and prompt changes). |
+| A4 | No way to measure answer quality. | 29-case golden eval set (offline in CI; live mode for model and prompt changes). |
 | A5 | No cost or latency visibility. | Structured per-turn logs with token, cache and latency fields; cached system prompt. |
 | A6 | Not accessible to users who can't type comfortably. | Voice input and read-aloud in Indian English and Hindi. |
 

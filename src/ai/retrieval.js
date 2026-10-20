@@ -18,7 +18,7 @@ const KEYWORD_WEIGHT = 3; // keywords are curated, so a hit there counts more th
 const PHRASE_BONUS = 2.5; // multi-word keyword found verbatim in the query
 
 const STOPWORDS = new Set(
-  'a an the is are was were be to of in on for and or my me i it this that with at by from what can do does how my mujhe mera meri mere hai hain ka ki ke ko se ne kya aur ya bhi'.split(' ')
+  'a an the is are was were be to of in on for and or my me i it this that with at by from what can do does how you your am will would could should please hi hello hey there my mujhe mera meri mere hai hain ka ki ke ko se ne kya aur ya bhi'.split(' ')
 );
 
 // Light suffix stripping for Latin-script words so "blackmailing",
