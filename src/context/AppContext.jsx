@@ -1,5 +1,6 @@
-import { createContext, useContext, useEffect, useReducer } from 'react';
-import { loadSession, saveSession, clearSession, seedDemoAccountIfMissing } from '../services/mockAuthStore.js';
+import { createContext, useContext, useEffect, useReducer, useRef } from 'react';
+import { loadSession, saveSession, clearSession, rememberClientProfile } from '../services/mockAuthStore.js';
+import { fetchCurrentUser, signOut } from '../services/authApi.js';
 import { seedDemoLawyerAccountIfMissing } from '../services/mockLawyerStore.js';
 
 const initialState = {
@@ -149,18 +150,43 @@ export function AppProvider({ children }) {
     }
   }, [state.theme, state.lang]);
 
-  // Mirror the logged-in user to localStorage so it survives a refresh.
-  // This is the ONLY thing persisted here — bookings, chat, etc. stay
-  // in-memory and reset on reload, same as before.
+  // Mirror the logged-in user to localStorage so the first render after a
+  // refresh shows the right screen (display data only; the server cookie is
+  // what proves the session). When a client session ends, however it ended
+  // (Sign out, account deleted, switching to a lawyer login), end it on the
+  // server too, so a reload can't bring it back.
+  const previousUserRef = useRef(state.user);
   useEffect(() => {
     if (state.user) saveSession(state.user);
     else clearSession();
+    const previous = previousUserRef.current;
+    previousUserRef.current = state.user;
+    if (previous?.role === 'client' && state.user?.email !== previous.email) signOut().catch(() => {});
   }, [state.user]);
 
-  // Make sure there's always a ready-made demo account to sign in with.
+  // Client accounts live on the server: confirm the cached profile (or pick
+  // up a session this browser doesn't have cached) and refresh it, e.g. a
+  // KYC change. Lawyer accounts are still browser-only, so they're left alone.
   useEffect(() => {
-    seedDemoAccountIfMissing();
-    // DEV-ONLY: also seed a demo lawyer account, so the lawyer side of the
+    const cached = loadSession();
+    if (cached && cached.role !== 'client') return;
+    fetchCurrentUser()
+      .then((user) => {
+        // Someone signed in or out while this was loading: theirs wins.
+        if (previousUserRef.current?.email !== cached?.email) return;
+        if (user) {
+          rememberClientProfile(user);
+          dispatch({ type: 'SET_USER', payload: user });
+        } else if (cached) dispatch({ type: 'LOGOUT' });
+      })
+      .catch(() => {
+        // Server unreachable: keep the cached profile; actions that need the
+        // server will report the problem themselves.
+      });
+  }, []);
+
+  useEffect(() => {
+    // DEV-ONLY: seed a demo lawyer account, so the lawyer side of the
     // appointment/case/chat flow is testable without hand-registering a
     // brand-new lawyer application first. import.meta.env.DEV is Vite's
     // built-in flag — this is false (and the call never happens) in a real

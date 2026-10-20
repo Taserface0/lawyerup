@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Icon from '../icons/Icon.jsx';
 import { initials } from '../lib/utils.js';
 import { useAppState, useAppDispatch } from '../context/AppContext.jsx';
@@ -7,7 +7,8 @@ import {
   getAllLawyerApplications,
   updateLawyerApplicationStatus,
 } from '../services/mockLawyerStore.js';
-import { getAllClientAccounts, updateKycStatus, deleteClientAccountCompletely } from '../services/mockAuthStore.js';
+import { deleteClientDataLocally } from '../services/mockAuthStore.js';
+import { adminListClients, adminSetKycStatus, adminDeleteClient } from '../services/authApi.js';
 
 const LAWYER_FILTERS = ['all', 'submitted', 'under_review', 'approved', 'rejected'];
 
@@ -17,7 +18,7 @@ export default function AdminScreen() {
   const { t } = useTranslation();
 
   const [applications, setApplications] = useState(() => getAllLawyerApplications());
-  const [clientAccounts, setClientAccounts] = useState(() => getAllClientAccounts());
+  const [clientAccounts, setClientAccounts] = useState([]); // loaded from the server below
   const [filter, setFilter] = useState('all');
   const [rejectingId, setRejectingId] = useState(null);
   const [rejectionDraft, setRejectionDraft] = useState('');
@@ -27,8 +28,11 @@ export default function AdminScreen() {
     setApplications(getAllLawyerApplications());
   }
   function refreshClients() {
-    setClientAccounts(getAllClientAccounts());
+    adminListClients()
+      .then(setClientAccounts)
+      .catch(() => {});
   }
+  useEffect(refreshClients, []);
 
   function handleStartReview(id) {
     updateLawyerApplicationStatus(id, 'under_review');
@@ -53,27 +57,30 @@ export default function AdminScreen() {
   }
 
   function handleForceApproveKyc(email) {
-    updateKycStatus(email, 'approved');
-    refreshClients();
+    adminSetKycStatus(email, 'approved').then(refreshClients, () => {});
   }
   function handleResetKyc(email) {
-    updateKycStatus(email, 'pending');
-    refreshClients();
+    adminSetKycStatus(email, 'pending').then(refreshClients, () => {});
   }
 
   // --- DEV-ONLY: cascading account deletion ---------------------------------
-  // See deleteClientAccountCompletely() in mockAuthStore.js for exactly what
-  // this removes (messages -> cases -> appointments -> account, matched to
-  // this one email only). Requires an explicit confirmation tap first —
-  // there is no single-click delete.
+  // Deletes the account on the server, then this browser's data for it (see
+  // deleteClientDataLocally() in mockAuthStore.js: messages -> cases ->
+  // appointments, matched to this one email only). Requires an explicit
+  // confirmation tap first — there is no single-click delete.
   function requestDeleteAccount(email) {
     setDeletingEmail(email);
   }
   function cancelDeleteAccount() {
     setDeletingEmail(null);
   }
-  function confirmDeleteAccount(email) {
-    deleteClientAccountCompletely(email);
+  async function confirmDeleteAccount(email) {
+    try {
+      await adminDeleteClient(email);
+    } catch {
+      return;
+    }
+    deleteClientDataLocally(email);
     setDeletingEmail(null);
     // If an admin happens to be testing this while signed in AS the
     // account they just deleted, sign them out too rather than leaving a

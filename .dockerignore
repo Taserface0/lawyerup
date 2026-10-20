@@ -8,3 +8,7 @@ evals/results
 .env
 .env.*
 !.env.example
+data
+*.db
+*.db-wal
+*.db-shm

@@ -3,7 +3,7 @@ import { isValidMobile, isValidPassword } from '../src/lib/utils.js';
 import { formatSlotDateForRecord } from '../src/services/mockAvailabilityStore.js';
 import { createCaseForAppointment, getCasesForClient } from '../src/services/mockCaseStore.js';
 import { getAllMarketplaceLawyers, seedDemoLawyerAccountIfMissing, updateLawyerApplicationStatus } from '../src/services/mockLawyerStore.js';
-import { registerMockAccount, deleteClientAccountCompletely, getClientAccountByEmail } from '../src/services/mockAuthStore.js';
+import { rememberClientProfile, deleteClientDataLocally, getClientAccountByEmail } from '../src/services/mockAuthStore.js';
 import { submitReview, getReviewsForLawyer } from '../src/services/mockReviewStore.js';
 import { createAppointment, getAppointmentsForClient } from '../src/services/mockAppointmentStore.js';
 import { sendMobileOtp, verifyMobileOtp } from '../src/services/mockOtpService.js';
@@ -31,8 +31,7 @@ describe('bookings', () => {
     const appt = (clientId) => ({ appointmentId: `a-${clientId}-${Math.random()}`, clientId, lawyerId: 1 });
     createCaseForAppointment(appt('a@x.in'));
     createCaseForAppointment(appt('b@x.in'));
-    registerMockAccount({ firstName: 'A', lastName: 'X', phone: '9000000000', email: 'a@x.in', city: 'Pune', password: 'password1' });
-    deleteClientAccountCompletely('a@x.in');
+    deleteClientDataLocally('a@x.in');
     const c = createCaseForAppointment(appt('c@x.in'));
     expect(c.caseNumber).toBe(3);
     expect(getCasesForClient('a@x.in')).toEqual([]);
@@ -53,15 +52,27 @@ describe('marketplace', () => {
 });
 
 describe('right to erasure', () => {
-  it('deletes the account and its bookings and anonymises its reviews', () => {
-    registerMockAccount({ firstName: 'Riya', lastName: 'S', phone: '9000000001', email: 'riya@x.in', city: 'Delhi', password: 'password1' });
+  it("removes a deleted account's bookings and profile from this browser and anonymises its reviews", () => {
+    rememberClientProfile({ role: 'client', firstName: 'Riya', lastName: 'S', name: 'Riya S', phone: '9000000001', email: 'riya@x.in', city: 'Delhi' });
+    expect(getClientAccountByEmail('RIYA@x.in')).toMatchObject({ name: 'Riya S' });
     createAppointment({ clientId: 'riya@x.in', lawyerId: 2, lawyerName: 'Adv. Farhan Sheikh', fee: 1500 });
     submitReview({ appointmentId: 'apt1', caseId: 'c1', lawyerId: 2, clientId: 'riya@x.in', clientName: 'Riya S', rating: 5, reviewText: 'my divorce case' });
-    deleteClientAccountCompletely('riya@x.in');
+    deleteClientDataLocally('riya@x.in');
     expect(getClientAccountByEmail('riya@x.in')).toBeNull();
     expect(getAppointmentsForClient('riya@x.in')).toEqual([]);
     const [review] = getReviewsForLawyer(2);
     expect(review).toMatchObject({ rating: 5, clientId: null, clientName: 'Former client', reviewText: '' });
+  });
+});
+
+describe('browser profile cache', () => {
+  it('never stores a password and removes the old mock account list', async () => {
+    localStorage.setItem('lawyerup_mock_accounts', JSON.stringify([{ email: 'a@x.in', passwordObfuscated: 'cGFzcw==' }]));
+    vi.resetModules();
+    const fresh = await import('../src/services/mockAuthStore.js');
+    expect(localStorage.getItem('lawyerup_mock_accounts')).toBeNull();
+    fresh.rememberClientProfile({ role: 'client', name: 'A', email: 'a@x.in', password: 'secret123', passwordHash: 'x' });
+    expect(localStorage.getItem('lawyerup_client_profiles')).not.toMatch(/secret123|passwordHash/);
   });
 });
 

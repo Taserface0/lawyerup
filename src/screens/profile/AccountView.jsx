@@ -5,7 +5,8 @@ import BookingCard from '../../components/BookingCard.jsx';
 import { useAppState, useAppDispatch } from '../../context/AppContext.jsx';
 import { useShowToast } from '../../hooks/useToast.js';
 import { useTranslation } from '../../hooks/useTranslation.js';
-import { getClientAccountByEmail, deleteClientAccountCompletely } from '../../services/mockAuthStore.js';
+import { deleteClientDataLocally } from '../../services/mockAuthStore.js';
+import { deleteMyAccount } from '../../services/authApi.js';
 import { getAppointmentsForClient } from '../../services/mockAppointmentStore.js';
 
 export default function AccountView() {
@@ -14,9 +15,9 @@ export default function AccountView() {
   const showToast = useShowToast();
   const { t } = useTranslation();
 
-  // Re-fetch fresh in case an admin force-approved KYC after login — user
-  // in context is just the snapshot from sign-in time.
-  const [profile] = useState(() => getClientAccountByEmail(user.email) || user);
+  // AppContext refreshes the user from the server on load (e.g. an admin
+  // force-approved KYC), so context already holds the latest profile.
+  const profile = user;
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   // Appointments moved to the persistent mockAppointmentStore in Phase 1
@@ -36,8 +37,19 @@ export default function AccountView() {
 
   // Right to erasure (DPDP Act, 2023 s.12): clients can delete their own
   // account and data. Previously only the dev-only admin screen could.
-  function deleteAccount() {
-    deleteClientAccountCompletely(user.email);
+  async function deleteAccount() {
+    try {
+      await deleteMyAccount();
+    } catch (err) {
+      // Session expired: sign out so they can sign in again and retry. The
+      // account itself was not deleted, so its data is kept.
+      if (err.message === 'not-signed-in') {
+        dispatch({ type: 'LOGOUT' });
+        showToast(t('toast.signedOut'));
+      } else showToast(t('toast.serverUnavailable'));
+      return;
+    }
+    deleteClientDataLocally(user.email);
     dispatch({ type: 'LOGOUT' });
     showToast(t('toast.accountDeleted'));
   }

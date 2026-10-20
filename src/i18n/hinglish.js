@@ -544,6 +544,7 @@ export const hinglish = {
     signedOut: 'Sign out ho gaya',
     loginFailed: 'Galat email ya password.',
     emailInUse: 'Is email se pehle se ek account maujood hai.',
+    serverUnavailable: 'Abhi server se connect nahi ho pa raha. Check karein ki app chal raha hai aur phir try karein.',
     applicationSubmitted: 'Application submit ho gayi — hum jald hi ise review karenge',
     accountDeleted: "Aapka account aur data delete ho gaya hai",
     lawyerCannotBook: "Lawyer accounts consultation book nahi kar sakte. Kripya client ke roop mein sign in karein.",

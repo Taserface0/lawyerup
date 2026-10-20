@@ -1,4 +1,4 @@
-FROM node:20-alpine AS build
+FROM node:24-alpine AS build
 
 WORKDIR /app
 
@@ -8,10 +8,11 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:20-alpine AS runtime
+FROM node:24-alpine AS runtime
 
 ENV NODE_ENV=production
 ENV PORT=8080
+ENV DB_PATH=/app/data/lawyerup.db
 WORKDIR /app
 
 COPY package.json package-lock.json ./
@@ -20,6 +21,9 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --chown=node:node server ./server
 COPY --chown=node:node src/ai ./src/ai
 COPY --from=build --chown=node:node /app/dist ./dist
+# The SQLite database lives here; docker-compose mounts a volume on it.
+RUN mkdir -p /app/data && chown node:node /app/data
+VOLUME /app/data
 
 USER node
 EXPOSE 8080

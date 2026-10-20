@@ -191,7 +191,7 @@ export function confirmCaseResolution(caseId) {
  * DEV-ONLY: deletes every case belonging to one client (matched by exact
  * clientId — never a prefix/partial match), returning the deleted case
  * ids so the caller can also clean up their messages first. Used by
- * mockAuthStore.js's deleteClientAccountCompletely() — always call
+ * mockAuthStore.js's deleteClientDataLocally() — always call
  * deleteMessagesForCase() for each returned id BEFORE this runs, and
  * always call this BEFORE deleting the client's appointments/account, so
  * nothing is ever left referencing a caseId or clientId that no longer

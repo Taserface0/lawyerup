@@ -7,7 +7,7 @@ LawyerUp is a mobile-first web app for people who suddenly need legal help: stop
 1. **Know Your Rights assistant.** An AI chat (text or voice, in English, Hindi or Hinglish) that explains what the law says and cites the provisions it relied on. It also shows emergency helplines the moment someone describes danger.
 2. **Lawyer marketplace.** Verified advocates with transparent fees, online or in-person consultations, case-specific chat, a case-resolution workflow and post-case reviews.
 
-> Status: **v0.8.1 prototype.** The AI assistant is real (through a server-side proxy, using Google Gemini's free tier or Anthropic Claude). Accounts, KYC, payments and lawyer data are local mocks backed by `localStorage`; see [What is real vs mocked](#what-is-real-vs-mocked).
+> Status: **v0.8.1 prototype.** The AI assistant is real (through a server-side proxy, using Google Gemini's free tier or Anthropic Claude). Client accounts and logins are real (a SQLite database on the server). KYC, payments, lawyer data, bookings and chats are still local mocks backed by `localStorage`; see [What is real vs mocked](#what-is-real-vs-mocked).
 
 ---
 
@@ -50,7 +50,7 @@ LawyerUp is a mobile-first web app for people who suddenly need legal help: stop
    ```
 4. Open <http://localhost:8080>. To view server logs, run `docker compose logs -f`; to stop the app, run `docker compose down`.
 
-The container runs the production build on Node.js 20, exposes port 8080 by default, and includes a `/healthz` health check. Set `PORT` in `.env` to change the host port. The AI key is supplied at container runtime; it is not baked into the image. Without an AI key, the site still runs but the live assistant is unavailable.
+The container runs the production build on Node.js 24, exposes port 8080 by default, and includes a `/healthz` health check. The accounts database is kept in the `lawyerup-data` Docker volume, so it survives `docker compose up --build`; `docker compose down -v` deletes it. Set `PORT` in `.env` to change the host port. The AI key is supplied at container runtime; it is not baked into the image. Without an AI key, the site still runs but the live assistant is unavailable.
 
 ### Which command do I use?
 
@@ -106,6 +106,17 @@ On macOS or Linux use `cp .env.example .env` in step 5.
 
 Mock OTP codes are printed to the browser console, never shown in the UI.
 
+### Accounts database
+
+Client accounts and login sessions are stored by the server in a SQLite file, `data/lawyerup.db` (set `DB_PATH` to move it). It is created on first start, uses Node's built-in `node:sqlite` (Node 22.13 or newer, nothing to install), and is excluded from git and Docker builds.
+
+- Passwords are hashed with scrypt and a per-user salt; the browser never stores one.
+- The session is an httpOnly cookie (7 days); the database stores only a hash of its token.
+- The demo client account is created on first start. Set `SEED_DEMO_ACCOUNT=false` to skip it.
+- **Reset:** stop the app and delete the `data` folder. A fresh database is created on the next start.
+
+The same account works in any browser or device that uses the same server. Lawyer accounts, bookings, cases and chats are still stored in each browser's `localStorage` and move to the database next.
+
 ---
 
 ## How the AI assistant works
@@ -136,9 +147,11 @@ Details, trade-offs and next steps: [docs/AI.md](docs/AI.md).
 
 ```
 server/             /api/chat: handler pipeline, provider switch (Gemini/Claude), rate limiter, prod server
+server/auth/        /api/auth: sign-up, login, sessions, password hashing
+server/db/          SQLite database, SQL migrations, account repository
 src/ai/             knowledge base, BM25 retrieval, guardrails, prompt + schema (shared by browser and server)
 src/context/        AppContext: global state via useReducer
-src/services/       localStorage mock "backend" (auth, lawyers, availability, appointments, cases, messages, reviews)
+src/services/       authApi.js (real accounts) + localStorage mocks (lawyers, availability, appointments, cases, messages, reviews)
 src/screens/        client, lawyer, consultation, admin (dev only) and legal screens
 src/components/     shared UI; src/modals/ booking and profile sheets
 src/i18n/           en.js / hi.js / hinglish.js (kept in strict key parity)
@@ -157,7 +170,8 @@ Architecture decisions that are deliberate (keep them):
 
 | Real | Mocked (replace before launch) |
 |---|---|
-| AI assistant through the server proxy | Accounts and passwords (base64 in `localStorage`, **not secure**) |
+| AI assistant through the server proxy | Lawyer accounts (in `localStorage`, **not secure**) |
+| Client accounts, hashed passwords, login sessions (SQLite) | |
 | Retrieval, guardrails, citation checks | OTP (console), KYC (auto-approves), document upload (filename only) |
 | Voice input and output (browser APIs) | Payments (no money moves), admin console (no auth, dev builds only) |
 | Booking and double-booking prevention logic | Lawyer directory, availability, chat (one device, cross-tab only) |

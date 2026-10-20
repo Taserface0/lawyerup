@@ -97,7 +97,7 @@ export function getUnreadCountForCase(caseId, viewerRole) {
 /**
  * DEV-ONLY: deletes every message belonging to one case. Used by the
  * cascading account-deletion tool in AdminScreen.jsx (see
- * mockAuthStore.js's deleteClientAccountCompletely()) — always call this
+ * mockAuthStore.js's deleteClientDataLocally()) — always call this
  * BEFORE deleting the case itself, so no message is ever left referencing
  * a caseId that no longer exists.
  */

@@ -4,7 +4,8 @@ import { useAppDispatch } from '../../context/AppContext.jsx';
 import { useShowToast } from '../../hooks/useToast.js';
 import { useTranslation } from '../../hooks/useTranslation.js';
 import { isValidEmail } from '../../lib/utils.js';
-import { verifyMockCredentials, DEMO_EMAIL, DEMO_PASSWORD } from '../../services/mockAuthStore.js';
+import { DEMO_EMAIL, DEMO_PASSWORD, rememberClientProfile } from '../../services/mockAuthStore.js';
+import { signIn } from '../../services/authApi.js';
 import { seedDemoConsultationsIfMissing } from '../../data/demoUser.js';
 
 export default function LoginFlow() {
@@ -15,22 +16,29 @@ export default function LoginFlow() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fieldErrors, setFieldErrors] = useState({});
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit(e) {
+  async function handleSubmit(e) {
     e.preventDefault();
     const errors = {};
     if (!email.trim()) errors.email = t('auth.errors.emailRequired');
     else if (!isValidEmail(email)) errors.email = t('auth.errors.emailInvalid');
     if (!password) errors.password = t('auth.errors.passwordRequired');
     setFieldErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0 || submitting) return;
 
-    const profile = verifyMockCredentials(email, password);
-    if (!profile) {
-      showToast(t('toast.loginFailed'));
+    let profile;
+    setSubmitting(true);
+    try {
+      profile = await signIn(email, password);
+    } catch (err) {
+      showToast(t(err.message === 'invalid-credentials' ? 'toast.loginFailed' : 'toast.serverUnavailable'));
       return;
+    } finally {
+      setSubmitting(false);
     }
 
+    rememberClientProfile(profile);
     dispatch({ type: 'SET_USER', payload: profile });
     if (profile.email.toLowerCase() === DEMO_EMAIL.toLowerCase()) {
       seedDemoConsultationsIfMissing(profile.email);
@@ -79,7 +87,7 @@ export default function LoginFlow() {
           {t('auth.forgotPasswordLink')}
         </button>
 
-        <button className="book-btn" type="submit">
+        <button className="book-btn" type="submit" disabled={submitting}>
           {t('auth.signInButton')}
         </button>
       </form>

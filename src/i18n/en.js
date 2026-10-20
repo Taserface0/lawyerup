@@ -549,6 +549,7 @@ export const en = {
     signedOut: 'Signed out',
     loginFailed: 'Incorrect email or password.',
     emailInUse: 'An account with this email already exists.',
+    serverUnavailable: "Can't reach the server right now. Check that the app is running and try again.",
     applicationSubmitted: "Application submitted — we'll review it soon",
     accountDeleted: "Your account and data have been deleted",
     lawyerCannotBook: "Lawyer accounts cannot book consultations. Please sign in as a client.",

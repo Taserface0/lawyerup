@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Real client accounts: a SQLite database on the server (`server/db`, Node's built-in `node:sqlite`, versioned SQL migrations) with `/api/auth` sign-up, login, logout, current user and delete-my-account. Passwords are hashed with scrypt and a per-user salt; sessions are httpOnly, SameSite=Lax cookies (7 days) stored as token hashes. Login and sign-up are rate-limited and give one generic error for a wrong email or password.
+- The browser no longer stores any password; the old mock account list is removed on first load. The same account now works from any browser that uses the same server.
+- Docker: Node 24 image, database in the `lawyerup-data` volume. Requires Node 22.13+.
+- Lawyer accounts, bookings, cases and chats are still browser-only (next phase).
+- 1 new string in all three languages (430 keys); 14 new tests (89 total).
+
 ## 0.8.5 (2026-10-20)
 
 - Voice capability questions now get a brief confirmation; speech transcription details are only provided when asked.

@@ -8,7 +8,7 @@ import { useShowToast } from '../../hooks/useToast.js';
 import { useTranslation } from '../../hooks/useTranslation.js';
 import { useOtpChannel } from '../../hooks/useOtpChannel.js';
 import { isValidEmail, isValidMobile, isValidPassword } from '../../lib/utils.js';
-import { emailIsRegistered } from '../../services/mockAuthStore.js';
+import { isEmailAvailable } from '../../services/authApi.js';
 import { completeRegistration } from '../../services/authService.js';
 import { sendMobileOtp, verifyMobileOtp } from '../../services/mockOtpService.js';
 import { sendEmailOtp, verifyEmailOtp } from '../../services/mockEmailService.js';
@@ -40,18 +40,28 @@ export default function RegisterFlow() {
     else if (!isValidMobile(form.phone)) errors.phone = t('register.errors.mobileInvalid');
     if (!form.email.trim()) errors.email = t('register.errors.emailRequired');
     else if (!isValidEmail(form.email)) errors.email = t('register.errors.emailInvalid');
-    else if (emailIsRegistered(form.email)) errors.email = t('toast.emailInUse');
     if (!form.city.trim()) errors.city = t('register.errors.cityRequired');
     if (!isValidPassword(form.password)) errors.password = t('register.errors.passwordTooShort');
     else if (form.password !== form.confirmPassword) errors.confirmPassword = t('register.errors.passwordsMismatch');
     return errors;
   }
 
-  function handleFormSubmit(e) {
+  async function handleFormSubmit(e) {
     e.preventDefault();
     const errors = validateForm();
     setFieldErrors(errors);
     if (Object.keys(errors).length > 0) return;
+    // Checked on the server before the OTP steps, so a taken email is caught
+    // up front. Sign-up itself checks again.
+    try {
+      if (!(await isEmailAvailable(form.email))) {
+        setFieldErrors({ email: t('toast.emailInUse') });
+        return;
+      }
+    } catch {
+      showToast(t('toast.serverUnavailable'));
+      return;
+    }
     setStep('verifyMobile');
   }
 
@@ -73,9 +83,13 @@ export default function RegisterFlow() {
       setCreatedUser(profile);
       setStep('success');
       showToast(t('toast.accountCreated'));
-    } catch {
-      setFieldErrors({ email: t('toast.emailInUse') });
-      setStep('form');
+    } catch (err) {
+      if (err.message === 'email-in-use') {
+        setFieldErrors({ email: t('toast.emailInUse') });
+        setStep('form');
+      } else {
+        showToast(t('toast.serverUnavailable'));
+      }
     }
   }
 

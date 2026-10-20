@@ -65,7 +65,7 @@ README rewrite, AGENTS.md, CONTRIBUTING, SECURITY, CHANGELOG, LICENSE (proprieta
 
 ## Known open items
 
-1. Real backend (auth, hashing, sessions, payments, document storage) per the existing `src/services` contract.
+1. Real backend: client accounts, scrypt password hashing and httpOnly sessions are done (`server/auth`, `server/db`, SQLite). Still open: lawyer accounts, bookings, cases, messages, payments and document storage.
 2. Lawyer review of `docs/legal/*` and of every passage in `src/ai/knowledge.js`.
 3. Run `npm run eval -- --live` with a real key and record the baseline before changing the prompt or model.
 4. Dev-only dependency advisories (vitest 2 / esbuild dev server). No production dependency is affected (`npm audit --omit=dev` is clean); clear them with an upgrade to Vite 7 + Vitest 4 as a separate change.

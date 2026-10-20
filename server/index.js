@@ -9,6 +9,8 @@ import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createChatMiddleware } from './http.js';
 import { createTtsMiddleware } from './tts.js';
+import { createAuthMiddleware } from './auth/handler.js';
+import { openDatabase } from './db/index.js';
 import { loadDotEnv } from './env.js';
 import { resolveProvider } from './provider.js';
 
@@ -37,12 +39,18 @@ const SECURITY_HEADERS = {
 
 const chat = createChatMiddleware({ env: process.env });
 const tts = createTtsMiddleware({ env: process.env });
+const auth = createAuthMiddleware({
+  db: openDatabase(process.env.DB_PATH || undefined),
+  adminRoutes: process.env.ENABLE_MOCK_ADMIN === 'true' || process.env.VITE_ENABLE_MOCK_ADMIN === 'true',
+  seedDemo: process.env.SEED_DEMO_ACCOUNT !== 'false',
+});
 
 createServer(async (req, res) => {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);
   const url = new URL(req.url, 'http://localhost');
   if (url.pathname === '/api/chat') return chat(req, res);
   if (url.pathname === '/api/tts') return tts(req, res);
+  if (url.pathname.startsWith('/api/auth/')) return auth(req, res);
   if (url.pathname === '/healthz') return res.end('ok');
 
   // Static files, falling back to index.html for the single-page app.

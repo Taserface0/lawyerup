@@ -130,7 +130,7 @@ export function updateAppointmentStatus(appointmentId, status) {
 /**
  * DEV-ONLY: deletes every appointment belonging to one client (matched by
  * exact clientId — never a prefix/partial match). Used by
- * mockAuthStore.js's deleteClientAccountCompletely() — always run this
+ * mockAuthStore.js's deleteClientDataLocally() — always run this
  * AFTER that client's cases (and their messages) have already been
  * deleted, and BEFORE deleting the account itself.
  */

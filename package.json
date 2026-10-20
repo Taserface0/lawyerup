@@ -33,6 +33,6 @@
   "description": "LawyerUp \u2014 know your rights under Indian law and book verified, transparently priced lawyers.",
   "license": "UNLICENSED",
   "engines": {
-    "node": ">=18.18"
+    "node": ">=22.13"
   }
 }

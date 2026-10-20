@@ -15,3 +15,11 @@ services:
       GEMINI_TTS_VOICE: ${GEMINI_TTS_VOICE:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       CLAUDE_MODEL: ${CLAUDE_MODEL:-}
+      SEED_DEMO_ACCOUNT: ${SEED_DEMO_ACCOUNT:-}
+    # Accounts database (SQLite). Kept in a named volume so it survives
+    # rebuilds; `docker compose down -v` deletes it.
+    volumes:
+      - lawyerup-data:/app/data
+
+volumes:
+  lawyerup-data:
