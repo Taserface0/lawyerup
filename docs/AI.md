@@ -46,9 +46,9 @@ ANTHROPIC_API_KEY=... CLAUDE_MODEL=claude-haiku-5-5 npm run eval -- --live
 
 ## Evals (`evals/`)
 
-`cases.json` holds 29 cases: arrest, FIR, traffic, tenancy, RERA, cyber fraud, blackmail, consumer, cheques, wages, domestic violence, self-harm, free legal aid, divorce, workplace harassment, PII, off-topic, prompt injection, outcome promises and small talk. They cover English, Hindi and Hinglish.
+`cases.json` holds 39 cases: arrest, FIR, traffic, tenancy, RERA, cyber fraud, blackmail, consumer, cheques, wages, domestic violence, self-harm, free legal aid, divorce, workplace harassment, PII, off-topic, prompt injection, outcome promises, small talk and fundamental rights (Constitution articles). They cover English, Hindi and Hinglish.
 
-- **Offline** (CI): retrieval recall, crisis detection, PII redaction. Currently 29/29.
+- **Offline** (CI): retrieval recall, crisis detection, PII redaction. Currently 39/39.
 - **Live**: adds category, urgency floor, grounded citation, required helplines, Hindi script, banned phrases and length. Results go to `evals/results/` for comparison over time.
 
 Building the eval already caught two real retrieval bugs: "blackmailing" didn't match "blackmail" (fixed with light stemming), and an off-topic poem request pulled in legal passages (fixed with score cut-offs).
