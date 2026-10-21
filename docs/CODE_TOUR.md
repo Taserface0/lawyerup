@@ -2,7 +2,7 @@
 
 A five-minute walkthrough of how LawyerUp works, for demos and interviews. Every link points at the exact lines, pinned to commit [`ea04690`](https://github.com/Taserface0/lawyerup/tree/ea04690b9d5d02d297cb42232dd7e77bacf832ae) so the line numbers stay correct as the code moves on.
 
-**Honest scope:** LawyerUp uses large language models (Google Gemini or Anthropic Claude) through their APIs. It does not train or fine-tune a model and does not use embeddings. The engineering is everything around the model: retrieval, context, guardrails, structured output, evaluation, and the backend that stores accounts, bookings and chats.
+**Honest scope:** LawyerUp uses large language models (Google Gemini or Anthropic Claude through their APIs, or an open-weights model on your own computer through Ollama). It does not train or fine-tune a model and does not use embeddings. The engineering is everything around the model: retrieval, context, guardrails, structured output, evaluation, and the backend that stores accounts, bookings and chats.
 
 ## The request flow
 
@@ -25,7 +25,7 @@ All of it is one function: [`handleChat` in `server/chatHandler.js`, lines 42-14
 
 ## 1. LLM integration (transformer models via API)
 
-The server builds one provider-neutral request; an adapter translates it for Gemini, and the official SDK sends it to Claude.
+The server builds one provider-neutral request; an adapter translates it for Gemini (or a local Ollama model, 1b below), and the official SDK sends it to Claude.
 
 [`server/chatHandler.js#L78-L84`](https://github.com/Taserface0/lawyerup/blob/ea04690b9d5d02d297cb42232dd7e77bacf832ae/server/chatHandler.js#L78-L84) · adapter: [`server/geminiClient.js#L31-L49`](https://github.com/Taserface0/lawyerup/blob/ea04690b9d5d02d297cb42232dd7e77bacf832ae/server/geminiClient.js#L31-L49) · provider choice: [`server/provider.js#L12`](https://github.com/Taserface0/lawyerup/blob/ea04690b9d5d02d297cb42232dd7e77bacf832ae/server/provider.js#L12)
 
@@ -42,6 +42,28 @@ The server builds one provider-neutral request; an adapter translates it for Gem
 **What to say:** "The pipeline is provider-agnostic: `createMessage` is injected, so the same guardrails and retrieval run on Gemini or Claude, and tests run with a fake model."
 
 **Likely follow-up:** *Why not call the model from the browser?* The API key would be exposed to anyone. Only `server/` reads the key, and CI fails the build if a key pattern shows up in the browser bundle (section 9).
+
+### 1b. A third provider: local models with Ollama
+
+`AI_PROVIDER=ollama` runs the same pipeline on a model on your own computer: no key, no quota, and questions never leave the machine. The adapter maps the same request onto Ollama's `/api/chat`, with the JSON schema in `format`.
+
+[`server/ollamaClient.js#L22-L34`](https://github.com/Taserface0/lawyerup/blob/712ea2c39f43a83e0e47a54a5c121238b125b4b6/server/ollamaClient.js#L22-L34) · settings: [`server/provider.js#L41-L50`](https://github.com/Taserface0/lawyerup/blob/712ea2c39f43a83e0e47a54a5c121238b125b4b6/server/provider.js#L41-L50) · startup check: [`server/ollamaClient.js#L94`](https://github.com/Taserface0/lawyerup/blob/712ea2c39f43a83e0e47a54a5c121238b125b4b6/server/ollamaClient.js#L94)
+
+```js
+  const body = {
+    model,
+    stream: false,
+    messages: [...(systemText ? [{ role: 'system', content: systemText }] : []), ...params.messages.map((m) => ({ role: m.role, content: m.content }))],
+    // A low temperature keeps small local models on the JSON format and the sources.
+    options: { num_predict: params.max_tokens, temperature: 0.2 },
+  };
+  const schema = params.output_config?.format?.schema;
+  if (schema) body.format = schema; // Ollama structured outputs take a plain JSON schema
+```
+
+**What to say:** "Because the pipeline only depends on `createMessage`, adding a local open-weights model was one adapter file: the guardrails, retrieval and citation checks didn't change."
+
+**Likely follow-up:** *Why not use Ollama for everything?* A small local model (default `qwen2.5:3b`, about 2 GB so it runs on a laptop CPU) gives weaker answers and Hindi than Gemini or Claude, its speed depends on the hardware, and it only works while that computer is on. It suits private, offline demos; `npm run eval -- --live` measures the difference.
 
 ---
 
