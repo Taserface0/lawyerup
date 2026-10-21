@@ -4,13 +4,13 @@
 //                                     both are. Ollama is only used when chosen.)
 //   ANTHROPIC_API_KEY, CLAUDE_MODEL
 //   GEMINI_API_KEY,    GEMINI_MODEL
-//   OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT_MS   (local model, no key)
+//   OLLAMA_URL, OLLAMA_MODEL, OLLAMA_TIMEOUT_MS, OLLAMA_MAX_TOKENS   (local model, no key)
 // Returns null when the chosen provider has no key, so the app shows its
 // "assistant not connected" message instead of failing.
 
 import { DEFAULT_MODEL } from './chatHandler.js';
 import { DEFAULT_GEMINI_MODEL } from './geminiClient.js';
-import { DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_URL, DEFAULT_OLLAMA_TIMEOUT_MS } from './ollamaClient.js';
+import { DEFAULT_OLLAMA_MODEL, DEFAULT_OLLAMA_URL, DEFAULT_OLLAMA_TIMEOUT_MS, DEFAULT_OLLAMA_MAX_TOKENS } from './ollamaClient.js';
 
 /** True when the provider can answer: it has a key, or needs none (Ollama). */
 export const isConfigured = (provider) => Boolean(provider?.name && (provider.apiKey || provider.keyless));
@@ -40,6 +40,7 @@ export function resolveProvider(env = process.env) {
   }
   if (name === 'ollama') {
     const timeoutMs = Number(env.OLLAMA_TIMEOUT_MS);
+    const maxTokens = Number(env.OLLAMA_MAX_TOKENS);
     return {
       name,
       apiKey: '',
@@ -47,6 +48,7 @@ export function resolveProvider(env = process.env) {
       model: (env.OLLAMA_MODEL || '').trim() || DEFAULT_OLLAMA_MODEL,
       url: (env.OLLAMA_URL || '').trim() || DEFAULT_OLLAMA_URL,
       timeoutMs: Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : DEFAULT_OLLAMA_TIMEOUT_MS,
+      maxTokens: Number.isInteger(maxTokens) && maxTokens > 0 ? maxTokens : DEFAULT_OLLAMA_MAX_TOKENS,
     };
   }
   if (name) throw new Error(`Unknown AI_PROVIDER "${env.AI_PROVIDER}". Use "anthropic", "gemini" or "ollama".`);
@@ -108,7 +110,7 @@ export async function createModelClient(env = process.env) {
   if (!isConfigured(provider)) return null;
   if (name === 'ollama') {
     const { createOllamaMessageFn } = await import('./ollamaClient.js');
-    return { name, model, createMessage: createOllamaMessageFn({ url: provider.url, model, timeoutMs: provider.timeoutMs }) };
+    return { name, model, createMessage: createOllamaMessageFn({ url: provider.url, model, timeoutMs: provider.timeoutMs, maxTokens: provider.maxTokens }) };
   }
   if (name === 'gemini') {
     const { createGeminiMessageFn } = await import('./geminiClient.js');

@@ -19,7 +19,9 @@ describe('Ollama provider settings', () => {
     const p = resolveProvider({ AI_PROVIDER: 'ollama' });
     expect(p).toMatchObject({ name: 'ollama', keyless: true, model: DEFAULT_OLLAMA_MODEL, url: DEFAULT_OLLAMA_URL, timeoutMs: 120000 });
     expect(isConfigured(p)).toBe(true);
-    expect(resolveProvider({ AI_PROVIDER: 'ollama', OLLAMA_MODEL: 'qwen2.5:7b', OLLAMA_URL: 'http://192.168.1.5:11434', OLLAMA_TIMEOUT_MS: '300000' })).toMatchObject({
+    expect(resolveProvider({ AI_PROVIDER: 'ollama' }).maxTokens).toBe(1024);
+    expect(resolveProvider({ AI_PROVIDER: 'ollama', OLLAMA_MODEL: 'qwen2.5:7b', OLLAMA_URL: 'http://192.168.1.5:11434', OLLAMA_TIMEOUT_MS: '300000', OLLAMA_MAX_TOKENS: '2048' })).toMatchObject({
+      maxTokens: 2048,
       model: 'qwen2.5:7b',
       url: 'http://192.168.1.5:11434',
       timeoutMs: 300000,
@@ -38,6 +40,9 @@ describe('Ollama adapter', () => {
   it('sends the system prompt as a system message, the schema in `format`, and max_tokens as num_predict', () => {
     const body = toOllamaRequest(PARAMS, 'qwen2.5:3b');
     expect(body).toMatchObject({ model: 'qwen2.5:3b', stream: false, format: RESPONSE_SCHEMA, options: { num_predict: 800 } });
+    // The handler's 8000-token cloud budget is capped for local models (default 1024).
+    expect(toOllamaRequest({ ...PARAMS, max_tokens: 8000 }, 'qwen2.5:3b').options.num_predict).toBe(1024);
+    expect(toOllamaRequest({ ...PARAMS, max_tokens: 8000 }, 'qwen2.5:3b', { maxTokens: 2048 }).options.num_predict).toBe(2048);
     expect(body.messages).toEqual([
       { role: 'system', content: 'You are the assistant.' },
       { role: 'user', content: 'Police arrested my brother' },

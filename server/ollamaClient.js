@@ -8,6 +8,7 @@
 //   OLLAMA_URL         default http://127.0.0.1:11434
 //   OLLAMA_MODEL       default qwen2.5:3b (see DEFAULT_OLLAMA_MODEL)
 //   OLLAMA_TIMEOUT_MS  default 120000 (CPU-only machines are slow)
+//   OLLAMA_MAX_TOKENS  default 1024: the most a local answer may generate
 
 export const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 // Small enough (about 2 GB) to answer at a usable speed on a laptop without a
@@ -15,18 +16,24 @@ export const DEFAULT_OLLAMA_URL = 'http://127.0.0.1:11434';
 // qwen2.5:7b answers better if the machine has the RAM (8 GB+) or a GPU.
 export const DEFAULT_OLLAMA_MODEL = 'qwen2.5:3b';
 export const DEFAULT_OLLAMA_TIMEOUT_MS = 120_000;
+// The chat handler asks for up to 8000 tokens (sized for cloud models that
+// think first). A full local answer is 300-450 tokens; on a laptop CPU (about
+// 11 tokens/s for qwen2.5:3b) a small model that runs on past its JSON would
+// otherwise hit the timeout. 1024 tokens finishes in about 90 s there, and a
+// cut-off answer takes the normal safe-fallback path instead of an error.
+export const DEFAULT_OLLAMA_MAX_TOKENS = 1024;
 
 const setupHint = (url, model) => `Ollama not reachable at ${url}. Start it (open the Ollama app, or run \`ollama serve\`) and run \`ollama pull ${model}\`.`;
 
 /** Converts the Anthropic-style params chatHandler builds into an Ollama /api/chat body. */
-export function toOllamaRequest(params, model) {
+export function toOllamaRequest(params, model, { maxTokens = DEFAULT_OLLAMA_MAX_TOKENS } = {}) {
   const systemText = (params.system || []).map((b) => (typeof b === 'string' ? b : b.text)).join('\n\n');
   const body = {
     model,
     stream: false,
     messages: [...(systemText ? [{ role: 'system', content: systemText }] : []), ...params.messages.map((m) => ({ role: m.role, content: m.content }))],
     // A low temperature keeps small local models on the JSON format and the sources.
-    options: { num_predict: params.max_tokens, temperature: 0.2 },
+    options: { num_predict: Math.min(params.max_tokens || maxTokens, maxTokens), temperature: 0.2 },
   };
   const schema = params.output_config?.format?.schema;
   if (schema) body.format = schema; // Ollama structured outputs take a plain JSON schema
@@ -56,6 +63,7 @@ export function createOllamaMessageFn({
   url = DEFAULT_OLLAMA_URL,
   model = DEFAULT_OLLAMA_MODEL,
   timeoutMs = DEFAULT_OLLAMA_TIMEOUT_MS,
+  maxTokens = DEFAULT_OLLAMA_MAX_TOKENS,
   fetchImpl = fetch,
 } = {}) {
   const base = url.replace(/\/+$/, '');
@@ -65,7 +73,7 @@ export function createOllamaMessageFn({
       res = await fetchImpl(`${base}/api/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(toOllamaRequest(params, model)),
+        body: JSON.stringify(toOllamaRequest(params, model, { maxTokens })),
         signal: AbortSignal.timeout(timeoutMs),
       });
     } catch (cause) {
