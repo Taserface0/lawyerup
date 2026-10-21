@@ -14,7 +14,7 @@ import { createDataMiddleware } from './data/handler.js';
 import { createEventHub } from './data/events.js';
 import { openDatabase } from './db/index.js';
 import { loadDotEnv } from './env.js';
-import { resolveProvider } from './provider.js';
+import { resolveProvider, isConfigured, checkProviderSetup } from './provider.js';
 
 loadDotEnv(fileURLToPath(new URL('../.env', import.meta.url)));
 
@@ -88,6 +88,7 @@ createServer(async (req, res) => {
     console.log(err.message);
     return;
   }
-  if (provider.name && provider.apiKey) console.log(`AI assistant: ${provider.name} (${provider.model})`);
+  if (isConfigured(provider)) console.log(`AI assistant: ${provider.name} (${provider.model})`);
   else console.log('No AI key set (GEMINI_API_KEY or ANTHROPIC_API_KEY in .env), so the assistant shows its offline message.');
+  checkProviderSetup(process.env).then((lines) => lines.forEach((line) => console.log(line)));
 });

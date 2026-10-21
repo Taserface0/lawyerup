@@ -36,6 +36,10 @@ On a safety-classifier decline the API is asked to retry on its recommended fall
 
 The free Gemini tier is for development and demos: Google may use free-tier prompts to improve its products. Use a paid tier of either provider for real users.
 
+**Ollama (local).** `AI_PROVIDER=ollama` runs the assistant on a model on the same computer (`server/ollamaClient.js`, `POST {OLLAMA_URL}/api/chat` with `stream: false`). The system prompt becomes a `system` message, `RESPONSE_SCHEMA` goes in Ollama's `format` field (structured outputs), `max_tokens` maps to `options.num_predict`, and the temperature is 0.2 to keep small models on the format. `<think>` blocks are stripped and `done_reason: "length"` maps to `max_tokens`; bad JSON takes the same safe-fallback path as the cloud providers. At startup the server calls `/api/tags` and prints an `[ai]` warning if Ollama isn't running or the model isn't pulled; request errors explain how to fix it (`ollama serve`, `ollama pull <model>`). The default model is `qwen2.5:3b` (about 2 GB, usable on a laptop CPU, handles Hindi and Hinglish, follows JSON schemas); `qwen2.5:7b` is better with 8 GB+ RAM or a GPU. `OLLAMA_TIMEOUT_MS` (default 120 s) covers slow CPU inference.
+
+Trade-offs: free, no quota and private (questions never leave the machine), but answers and Hindi quality are weaker than Gemini or Claude, speed depends on the hardware, and it only works while that computer is on, so it suits local demos and development, not a hosted site. Prompt caching does not apply. Measure a local model with `npm run eval -- --live` before relying on it.
+
 ## Model and cost
 
 The default is `claude-opus-5-5` at `effort: low`. Set `CLAUDE_MODEL` to compare alternatives; `claude-haiku-5-5` is far cheaper and may be enough for this task. Decide with the live eval, not by guessing:

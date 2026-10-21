@@ -30,7 +30,7 @@ async function main() {
     loadDotEnv(new URL('../.env', import.meta.url));
     ai = await createModelClient(process.env);
     if (!ai) {
-      console.error('--live needs GEMINI_API_KEY or ANTHROPIC_API_KEY (environment or .env).');
+      console.error('--live needs GEMINI_API_KEY or ANTHROPIC_API_KEY, or AI_PROVIDER=ollama (environment or .env).');
       process.exit(1);
     }
     ({ handleChat } = await import('../server/chatHandler.js'));

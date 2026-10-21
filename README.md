@@ -64,15 +64,25 @@ The container runs the production build on Node.js 24, exposes port 8080 by defa
 
 Both run the same `/api/chat` backend, so the key stays on your computer's server process and never reaches the browser. The terminal prints which AI is connected when you use `npm start`.
 
-### Free Gemini vs paid Claude
+### Free Gemini, paid Claude or local Ollama
 
-| | Gemini (free tier) | Claude (paid) |
-|---|---|---|
-| Cost | Free, with daily request limits | Pay per use |
-| Good for | Development, demos, college projects | Real users |
-| Privacy | Google may use free-tier prompts to improve its products | Not used for training under API terms |
+| | Gemini (free tier) | Claude (paid) | Ollama (local) |
+|---|---|---|---|
+| Cost | Free, with daily request limits | Pay per use | Free, no limits |
+| Good for | Development, demos, college projects | Real users | Offline demos, privacy, no quota |
+| Privacy | Google may use free-tier prompts to improve its products | Not used for training under API terms | Questions never leave your computer |
+| Catch | Free tier can be slow or busy | Costs money | Weaker answers, needs RAM (GPU helps), only while your PC is on |
 
-The guardrails, statute retrieval, citation checks and logs work the same with either provider (`server/provider.js`). If you hit the free limit, the chat shows an error until the quota resets.
+The guardrails, statute retrieval, citation checks and logs work the same with every provider (`server/provider.js`). If you hit the Gemini free limit, the chat shows an error until the quota resets.
+
+**Using Ollama on Windows:**
+
+1. Install Ollama from <https://ollama.com/download> and open it (it runs in the background).
+2. In a terminal: `ollama pull qwen2.5:3b` (about 2 GB, once).
+3. In `.env`: `AI_PROVIDER=ollama` (optional: `OLLAMA_MODEL=qwen2.5:7b` for better answers if you have the RAM).
+4. Restart `npm run dev`. The terminal says `[ai] Assistant: ollama (...)`, and warns if Ollama isn't running or the model isn't pulled.
+
+Spoken answers still use Gemini's voice when a `GEMINI_API_KEY` is set, otherwise the browser's own voice. Run `npm run eval -- --live` to compare a local model with Gemini.
 
 ### All scripts
 

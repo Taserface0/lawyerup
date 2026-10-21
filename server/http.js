@@ -58,7 +58,7 @@ function upstreamHint(err) {
     400: 'Check the key in .env (copy it again from the provider).',
     401: 'The API key was rejected. Copy it again, or create a new one.',
     403: 'The API key is not allowed to use this model or API.',
-    404: 'The model name is wrong. Remove GEMINI_MODEL / CLAUDE_MODEL from .env to use the default.',
+    404: 'The model name is wrong. Remove GEMINI_MODEL / CLAUDE_MODEL from .env to use the default (for Ollama: pull the model, or fix OLLAMA_MODEL).',
     429: 'Free quota or rate limit reached. Wait a minute and try again.',
     503: 'Google says this model is overloaded; the backup models were busy too. Try again in a minute.',
     504: 'The AI took too long to answer. Try again in a minute.',
