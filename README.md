@@ -2,6 +2,8 @@
 
 **Know your rights under Indian law, in your language, and reach a verified lawyer with an upfront price.**
 
+> **Code tour:** [docs/CODE_TOUR.md](docs/CODE_TOUR.md) walks through the AI pipeline (RAG, context engineering, guardrails, evals) and the backend (auth, atomic booking, live chat), with links to the exact code.
+
 LawyerUp is a mobile-first web app for people who suddenly need legal help: stopped by police, threatened with eviction, scammed online. It has two parts:
 
 1. **Know Your Rights assistant.** An AI chat (text or voice, in English, Hindi or Hinglish) that explains what the law says and cites the provisions it relied on. It also shows emergency helplines the moment someone describes danger.
