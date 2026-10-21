@@ -6,7 +6,6 @@
 // =============================================================================
 
 import { signUp } from './authApi.js';
-import { rememberClientProfile } from './mockAuthStore.js';
 import { sendWelcomeEmail } from './mockEmailService.js';
 
 /**
@@ -37,7 +36,6 @@ export async function completeRegistration({
   welcomeBody,
 }) {
   const profile = await signUp({ firstName, lastName, phone, email, city, password, kycStatus });
-  rememberClientProfile(profile);
   await sendWelcomeEmail({ toEmail: email, subject: welcomeSubject, body: welcomeBody });
   return profile;
 }

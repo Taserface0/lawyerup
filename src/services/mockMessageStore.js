@@ -1,11 +1,13 @@
 // =============================================================================
-// MOCK ONLY — case-specific consultation messages.
+// Case-specific consultation messages between a client and their lawyer.
+// Stored in the server database since Phase 3 (server/db/conversations.js);
+// this module reads the browser's copy in serverData.js, which holds only
+// the messages of this visitor's own cases. New messages and read receipts
+// reach the other person through the live-update stream (see
+// connectLiveUpdates() in serverData.js), on any device.
 //
 // THIS IS NOT THE AI "KNOW YOUR RIGHTS" CHATBOT. That feature (src/hooks/
-// useChat.js, src/lib/claudeApi.js) is a separate, unrelated chat with
-// Claude and is untouched by this file. This store is for real (mocked)
-// human-to-human messages between a specific client and a specific lawyer,
-// scoped to one Case.
+// useChat.js, src/lib/claudeApi.js) is a separate, unrelated chat.
 //
 // Every message is tagged with a caseId and nothing else links two
 // messages together — there is no "conversation between client X and
@@ -13,35 +15,19 @@
 // lawyer with three separate cases have three separate, non-overlapping
 // message threads. This is intentional and load-bearing for the product
 // requirement that different legal matters must never mix.
-//
-// Same global-localStorage-key pattern as the other mock stores. A real
-// backend replaces this with a `messages` table plus a real-time transport
-// (websockets or similar) — this file is explicitly NOT that. Sending a
-// message here just writes to localStorage; the window `storage` event
-// (wired up in ConsultationScreen.jsx) is what lets an ALREADY-OPEN chat in
-// a different browser tab notice the write and re-read, purely as a
-// same-origin, same-device convenience for local multi-tab testing. It
-// does not deliver messages across different devices/browsers, does not
-// work if the tab is closed, and is not a substitute for real real-time
-// messaging infrastructure.
 // =============================================================================
 
+import { serverData, patchServerData, mutateInBackground } from './serverData.js';
+
+// Screens listen for this key in `storage` events; kept for compatibility.
 export const MESSAGES_STORAGE_KEY = 'lawyerup_mock_messages';
 
-function readAllMessages() {
-  try {
-    const raw = localStorage.getItem(MESSAGES_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeAllMessages(list) {
-  localStorage.setItem(MESSAGES_STORAGE_KEY, JSON.stringify(list));
-}
+const oldestFirst = (a, b) => new Date(a.createdAt) - new Date(b.createdAt);
 
 /**
+ * Sends a message. It shows up in the thread at once; the server then stores
+ * it (only the case's client or lawyer may post, never on a CLOSED case).
+ *
  * @param {string} caseId
  * @param {string} senderId - client email or lawyer id, whichever is sending
  * @param {'client'|'lawyer'} senderRole
@@ -50,9 +36,8 @@ function writeAllMessages(list) {
 export function sendMessage({ caseId, senderId, senderRole, text }) {
   const trimmed = text.trim();
   if (!trimmed) throw new Error('empty-message');
-  const messages = readAllMessages();
   const message = {
-    id: `msg_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+    id: `pending_${Date.now()}_${Math.floor(Math.random() * 10000)}`, // replaced by the server's copy on the next refresh
     caseId,
     senderId,
     senderRole,
@@ -60,49 +45,49 @@ export function sendMessage({ caseId, senderId, senderRole, text }) {
     createdAt: new Date().toISOString(),
     readAt: null,
   };
-  messages.push(message);
-  writeAllMessages(messages);
+  patchServerData({ messages: [...serverData().messages, message] });
+  mutateInBackground('messages', { caseId, text: trimmed });
   return message;
 }
 
 export function getMessagesForCase(caseId) {
-  return readAllMessages()
-    .filter((m) => m.caseId === caseId)
-    .sort((a, b) => new Date(a.createdAt) - new Date(b.createdAt));
+  return serverData()
+    .messages.filter((m) => m.caseId === caseId)
+    .sort(oldestFirst);
 }
 
 /**
  * Marks every message NOT sent by `viewerRole` as read, for the unread-badge
- * feature. Called when a participant opens a case's chat screen.
+ * feature. Called when a participant opens a case's chat screen. Only talks
+ * to the server when something was actually unread.
  */
 export function markCaseMessagesRead(caseId, viewerRole) {
-  const messages = readAllMessages();
   let changed = false;
-  const updated = messages.map((m) => {
+  const now = new Date().toISOString();
+  const messages = serverData().messages.map((m) => {
     if (m.caseId === caseId && m.senderRole !== viewerRole && !m.readAt) {
       changed = true;
-      return { ...m, readAt: new Date().toISOString() };
+      return { ...m, readAt: now };
     }
     return m;
   });
-  if (changed) writeAllMessages(updated);
+  if (changed) {
+    patchServerData({ messages });
+    mutateInBackground('messages/read', { caseId });
+  }
   return changed;
 }
 
 /** Count of unread messages in a case, from the given viewer's perspective. */
 export function getUnreadCountForCase(caseId, viewerRole) {
-  return readAllMessages().filter((m) => m.caseId === caseId && m.senderRole !== viewerRole && !m.readAt).length;
+  return serverData().messages.filter((m) => m.caseId === caseId && m.senderRole !== viewerRole && !m.readAt).length;
 }
 
 /**
- * DEV-ONLY: deletes every message belonging to one case. Used by the
- * cascading account-deletion tool in AdminScreen.jsx (see
- * mockAuthStore.js's deleteClientDataLocally()) — always call this
- * BEFORE deleting the case itself, so no message is ever left referencing
- * a caseId that no longer exists.
+ * Drops one case's messages from the browser's copy after the server deleted
+ * the account they belonged to (the server already deleted the rows). Used by
+ * mockAuthStore.js's deleteClientDataLocally().
  */
 export function deleteMessagesForCase(caseId) {
-  const messages = readAllMessages();
-  const remaining = messages.filter((m) => m.caseId !== caseId);
-  writeAllMessages(remaining);
+  patchServerData({ messages: serverData().messages.filter((m) => m.caseId !== caseId) });
 }

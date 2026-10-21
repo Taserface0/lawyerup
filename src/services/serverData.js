@@ -1,16 +1,18 @@
 // =============================================================================
-// The browser's copy of the server data for lawyers, availability, bookings
-// and cases (server/data/handler.js). The stores (mockLawyerStore,
-// mockAvailabilityStore, mockAppointmentStore, mockCaseStore) keep their
-// synchronous functions and read from this copy, so the screens did not have
-// to change. It holds only what the server lets this visitor see.
+// The browser's copy of the server data for lawyers, availability, bookings,
+// cases, consultation messages and reviews (server/data/handler.js). The
+// store files (mockLawyerStore, mockAvailabilityStore, mockAppointmentStore,
+// mockCaseStore, mockMessageStore, mockReviewStore) keep their synchronous
+// functions and read from this copy, so the screens did not have to change.
+// It holds only what the server lets this visitor see.
 //
-// - refreshServerData() reloads it; AppContext calls it on start, after
-//   sign-in/out, when the window regains focus and every few seconds, so a
-//   booking made in another browser shows up without a reload.
+// - refreshServerData() reloads it. AppContext calls it on start, after
+//   sign-in/out, when the window regains focus, whenever the live-update
+//   stream says something changed (connectLiveUpdates), and on a timer as a
+//   fallback for when the stream can't connect.
 // - mutate() applies a change locally first (the store passes the optimistic
 //   update), sends it to the server, and then reloads. If the server refuses,
-//   the reload puts the real state back and onServerDataError listeners hear
+//   the reload puts the real state back and DATA_ERROR_EVENT listeners hear
 //   about it.
 // - Every change fires DATA_EVENT on window; AppContext re-renders on it.
 // =============================================================================
@@ -18,7 +20,34 @@
 export const DATA_EVENT = 'lawyerup:data';
 export const DATA_ERROR_EVENT = 'lawyerup:data-error';
 
-const EMPTY = { approvedLawyers: [], openSlots: [], appointments: [], cases: [], mySlots: [], clients: [] };
+// Before the database, all of this lived in localStorage under these keys.
+// The server is the source of truth now, so the old copies are removed
+// (they included other people's names and phone numbers).
+const LEGACY_KEYS = [
+  'lawyerup_mock_appointments',
+  'lawyerup_mock_cases',
+  'lawyerup_mock_availability',
+  'lawyerup_mock_messages',
+  'lawyerup_mock_reviews',
+  'lawyerup_client_profiles',
+];
+try {
+  for (const key of LEGACY_KEYS) localStorage.removeItem(key);
+} catch {
+  /* storage unavailable */
+}
+
+const EMPTY = {
+  approvedLawyers: [],
+  openSlots: [],
+  ratings: {},
+  appointments: [],
+  cases: [],
+  mySlots: [],
+  clients: [],
+  messages: [],
+  myReviews: [],
+};
 let data = { ...EMPTY };
 let loaded = false;
 
@@ -39,7 +68,7 @@ export function patchServerData(changes) {
 
 /** Forget everything private, e.g. right after signing out. */
 export function resetServerData() {
-  data = { ...EMPTY, approvedLawyers: data.approvedLawyers, openSlots: data.openSlots };
+  data = { ...EMPTY, approvedLawyers: data.approvedLawyers, openSlots: data.openSlots, ratings: data.ratings };
   emit(DATA_EVENT);
 }
 
@@ -94,4 +123,27 @@ export async function mutate(path, body) {
 /** Fire-and-forget form used by the synchronous store functions; errors surface through DATA_ERROR_EVENT. */
 export function mutateInBackground(path, body) {
   mutate(path, body).catch(() => {});
+}
+
+/**
+ * Opens the live-update stream (Server-Sent Events, GET /api/data/events)
+ * for the signed-in visitor: each "change" event reloads the data, so a new
+ * message, booking or case change from the other person shows up at once,
+ * on any device. EventSource reconnects by itself after a dropped connection.
+ * Returns { close, isOpen }; call close() on sign-out.
+ */
+export function connectLiveUpdates() {
+  if (typeof EventSource === 'undefined') return { close() {}, isOpen: () => false };
+  const source = new EventSource('/api/data/events', { withCredentials: true });
+  source.addEventListener('change', () => {
+    refreshServerData().catch(() => {});
+  });
+  // After a reconnect, catch up on anything missed while it was down.
+  source.addEventListener('open', () => {
+    refreshServerData().catch(() => {});
+  });
+  return {
+    close: () => source.close(),
+    isOpen: () => source.readyState === EventSource.OPEN,
+  };
 }

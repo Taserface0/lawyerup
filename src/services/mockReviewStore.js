@@ -1,71 +1,40 @@
 // =============================================================================
-// MOCK ONLY — client feedback/reviews after a closed consultation.
+// Client feedback/reviews after a closed consultation. Stored in the server
+// database since Phase 3 (server/db/conversations.js), which also computes
+// every lawyer's published rating (serverData().ratings), so a rating can't
+// be changed from the browser.
 //
-// This is NOT a second review system. The existing rating/reviews/revs
-// fields on lawyer objects (originally just static flavor data in
-// data/lawyers.js) remain the ONLY place any screen reads a lawyer's
-// rating from — mockLawyerStore.js's getAllMarketplaceLawyers() and
-// findMarketplaceLawyerById() fold real submitted reviews (from this
-// file) into those same three fields before returning a lawyer object, so
-// LawyerCard.jsx and LawyerProfileModal.jsx need zero changes to display
-// real feedback — they already read lawyer.rating/.reviews/.revs exactly
-// as before. See mockLawyerStore.js's applySubmittedReviews().
+// This is NOT a second review system. The rating/reviews/revs fields on
+// lawyer objects remain the ONLY place any screen reads a lawyer's rating
+// from — mockLawyerStore.js's applySubmittedReviews() puts the server's
+// rating into those same fields, so LawyerCard.jsx and LawyerProfileModal.jsx
+// read lawyer.rating/.reviews/.revs exactly as before.
 //
-// One review per appointment (enforced here, not just hidden in the UI —
-// see submitReview()'s duplicate check). A review is tied to a specific
-// completed appointment/case, not the lawyer relationship in general — a
-// client who books the same lawyer again for a new matter gets a fresh,
-// independent chance to review that new appointment once IT closes.
-//
-// Same global-localStorage-key pattern as every other mock store here. A
-// real backend replaces this with a `reviews` table with a unique
-// constraint on appointment_id, and recomputes the lawyer's aggregate
-// rating server-side (likely via a trigger or a scheduled job) rather
-// than on every read the way this prototype does.
+// One review per appointment, by that appointment's client, only after its
+// case is CLOSED (enforced by the server; the UI also hides the form).
 // =============================================================================
 
-const REVIEWS_STORAGE_KEY = 'lawyerup_mock_reviews';
-
-function readReviews() {
-  try {
-    const raw = localStorage.getItem(REVIEWS_STORAGE_KEY);
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function writeReviews(list) {
-  localStorage.setItem(REVIEWS_STORAGE_KEY, JSON.stringify(list));
-}
+import { serverData, patchServerData, mutateInBackground } from './serverData.js';
 
 /**
- * Submits a review for one specific appointment. Returns the created
- * review, or null if either the rating is missing/out of range or a
- * review already exists for this appointmentId (one review per
- * appointment/case — the UI is expected to hide the form once a review
- * exists, but this is the data-layer backstop for that same rule, the
- * same pattern used throughout this project's other stores).
+ * Submits a review for one specific appointment. Returns the review (shown
+ * at once; the server then stores it), or null if the rating is missing/out
+ * of range or this client already reviewed the appointment.
  *
  * @param {object} params
  * @param {string} params.appointmentId
  * @param {string} params.caseId
  * @param {number} params.lawyerId
  * @param {string} params.clientId - the client's email
- * @param {string} params.clientName - display name, stored in the
- *   review's own record (not looked up live later) so the lawyer's
- *   review list keeps showing the reviewer's name as it was at review
- *   time, matching how the existing static revs entries work
+ * @param {string} params.clientName - display name shown with the review
  * @param {number} params.rating - 1-5, required
  * @param {string} params.reviewText - optional, may be empty string
  */
 export function submitReview({ appointmentId, caseId, lawyerId, clientId, clientName, rating, reviewText }) {
   if (!Number.isInteger(rating) || rating < 1 || rating > 5) return null;
-  const reviews = readReviews();
-  const alreadyReviewed = reviews.some((r) => r.appointmentId === appointmentId);
-  if (alreadyReviewed) return null;
+  if (getReviewForAppointment(appointmentId)) return null;
   const review = {
-    reviewId: `rev_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+    reviewId: `pending_${Date.now()}`,
     appointmentId,
     caseId,
     lawyerId,
@@ -75,31 +44,26 @@ export function submitReview({ appointmentId, caseId, lawyerId, clientId, client
     reviewText: reviewText || '',
     createdAt: new Date().toISOString(),
   };
-  reviews.push(review);
-  writeReviews(reviews);
+  patchServerData({ myReviews: [...serverData().myReviews, review] });
+  mutateInBackground('reviews', { appointmentId, rating, reviewText: review.reviewText });
   return review;
 }
 
+/** This client's own review of an appointment, if they left one. */
 export function getReviewForAppointment(appointmentId) {
-  return readReviews().find((r) => r.appointmentId === appointmentId) || null;
-}
-
-export function getReviewsForLawyer(lawyerId) {
-  return readReviews().filter((r) => r.lawyerId === lawyerId);
+  return serverData().myReviews.find((r) => r.appointmentId === appointmentId) || null;
 }
 
 /**
- * Erasure (DPDP Act s.12): a deleted client's reviews are anonymised rather
- * than removed, so the lawyer's published rating does not silently change,
- * while the name and free-text (which may identify the client) are erased.
+ * A lawyer's published rating with submitted reviews folded in, as computed
+ * by the server: { rating, reviews, revs: [{ n, r, c }] }, or null when the
+ * lawyer has no submitted reviews yet.
  */
+export function getRatingSummaryForLawyer(lawyerId) {
+  return serverData().ratings[lawyerId] || null;
+}
+
+/** Drops a deleted client's reviews from this browser's copy; the server has anonymised them. */
 export function anonymiseReviewsForClient(clientId) {
-  const reviews = readReviews();
-  let changed = false;
-  const updated = reviews.map((r) => {
-    if (r.clientId !== clientId) return r;
-    changed = true;
-    return { ...r, clientId: null, clientName: 'Former client', reviewText: '' };
-  });
-  if (changed) writeReviews(updated);
+  patchServerData({ myReviews: serverData().myReviews.filter((r) => r.clientId !== clientId) });
 }

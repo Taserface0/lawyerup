@@ -145,7 +145,7 @@ describe('auth API', () => {
 
   it('runs migrations once and survives a restart on the same database', () => {
     const versions = db.prepare('SELECT version FROM schema_migrations').all();
-    expect(versions).toEqual([{ version: 1 }, { version: 2 }]);
+    expect(versions).toEqual([{ version: 1 }, { version: 2 }, { version: 3 }]);
   });
 
   it('never logs passwords or tokens on a server error', async () => {

@@ -11,6 +11,7 @@ import { createChatMiddleware } from './http.js';
 import { createTtsMiddleware } from './tts.js';
 import { createAuthMiddleware } from './auth/handler.js';
 import { createDataMiddleware } from './data/handler.js';
+import { createEventHub } from './data/events.js';
 import { openDatabase } from './db/index.js';
 import { loadDotEnv } from './env.js';
 import { resolveProvider } from './provider.js';
@@ -41,13 +42,15 @@ const SECURITY_HEADERS = {
 const chat = createChatMiddleware({ env: process.env });
 const tts = createTtsMiddleware({ env: process.env });
 const db = openDatabase(process.env.DB_PATH || undefined);
+const events = createEventHub(); // live updates, shared by /api/auth and /api/data
 const auth = createAuthMiddleware({
   db,
+  events,
   adminRoutes: process.env.ENABLE_MOCK_ADMIN === 'true' || process.env.VITE_ENABLE_MOCK_ADMIN === 'true',
   seedDemo: process.env.SEED_DEMO_ACCOUNT !== 'false',
   seedDemoLawyer: process.env.SEED_DEMO_LAWYER === 'true',
 });
-const data = createDataMiddleware({ db, ready: auth.ready });
+const data = createDataMiddleware({ db, events, ready: auth.ready });
 
 createServer(async (req, res) => {
   for (const [k, v] of Object.entries(SECURITY_HEADERS)) res.setHeader(k, v);

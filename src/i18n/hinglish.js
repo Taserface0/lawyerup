@@ -416,7 +416,7 @@ export const hinglish = {
     },
     chatTitle: 'Chat',
     chatMockNotice:
-      'Yeh ek prototype chat hai — messages is device par locally store hote hain aur abhi kisi real messaging server ke through nahi bheje jaate.',
+      'Is consultation ke messages sirf aap aur aapke lawyer dekh sakte hain. Kripya yahan password, OTP ya bank details share na karein.',
     chatEmpty: 'Abhi tak koi message nahi hai. Shuru karne ke liye hello kahein.',
     chatError: 'Is conversation ko load karne mein kuch gadbad hui. Please phir se try karein.',
     notFound: 'Yeh consultation nahi mili.',

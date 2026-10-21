@@ -4,7 +4,7 @@ import { useAppDispatch } from '../../context/AppContext.jsx';
 import { useShowToast } from '../../hooks/useToast.js';
 import { useTranslation } from '../../hooks/useTranslation.js';
 import { isValidEmail } from '../../lib/utils.js';
-import { DEMO_EMAIL, DEMO_PASSWORD, rememberClientProfile } from '../../services/mockAuthStore.js';
+import { DEMO_EMAIL, DEMO_PASSWORD } from '../../services/mockAuthStore.js';
 import { signIn } from '../../services/authApi.js';
 
 export default function LoginFlow() {
@@ -37,7 +37,6 @@ export default function LoginFlow() {
       setSubmitting(false);
     }
 
-    rememberClientProfile(profile);
     dispatch({ type: 'SET_USER', payload: profile });
     showToast(t('toast.welcomeBackToast', { name: profile.firstName || profile.name.split(' ')[0] }));
   }

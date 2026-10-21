@@ -26,8 +26,10 @@ function chatApiPlugin(env) {
       const { openDatabase } = await import('./server/db/index.js');
       // Vitest also starts this server; keep its database in memory.
       const db = openDatabase(env.DB_PATH || (process.env.VITEST ? ':memory:' : undefined));
-      const auth = createAuthMiddleware({ db, adminRoutes: true, seedDemo: env.SEED_DEMO_ACCOUNT !== 'false', seedDemoLawyer: true });
-      const data = createDataMiddleware({ db, ready: auth.ready });
+      const { createEventHub } = await import('./server/data/events.js');
+      const events = createEventHub(); // live updates, shared by /api/auth and /api/data
+      const auth = createAuthMiddleware({ db, events, adminRoutes: true, seedDemo: env.SEED_DEMO_ACCOUNT !== 'false', seedDemoLawyer: true });
+      const data = createDataMiddleware({ db, events, ready: auth.ready });
       server.middlewares.use('/api/auth', (req, res) => auth(req, res));
       server.middlewares.use('/api/data', (req, res) => data(req, res));
     },

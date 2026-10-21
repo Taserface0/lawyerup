@@ -420,7 +420,7 @@ export const en = {
     },
     chatTitle: 'Chat',
     chatMockNotice:
-      'This is a prototype chat — messages are stored locally on this device and are not sent through a real messaging server yet.',
+      "Messages in this consultation are seen only by you and your lawyer. Please don't share passwords, OTPs or bank details here.",
     chatEmpty: 'No messages yet. Say hello to get started.',
     chatError: 'Something went wrong loading this conversation. Please try again.',
     notFound: 'This consultation could not be found.',

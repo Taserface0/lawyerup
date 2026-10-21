@@ -16,8 +16,16 @@ Phase 2:
 - The store files keep their synchronous functions, now reading a server copy that refreshes every 10 s and on focus, so the screens did not change; the old browser lists with base64 passwords are deleted on load.
 - Demo data (the demo lawyer and the demo client's two past consultations) is seeded by the server.
 - Fixed: the checkout and confirmation said "Today" whatever day the slot was on; the sign-up password hint said 6 characters while 8 are required; a lawyer whose session was restored by the server opened on the client Home screen.
-- Chat messages and reviews are still browser-only (next phase).
 - 1 new string (431 keys); 14 new server tests (`tests/data.test.js`), 105 total.
+
+Phase 3:
+
+- Consultation messages and reviews moved to the database (migration 003). Only the case's client and lawyer can read or post; a CLOSED case is read-only; messages are 1-4,000 characters and posting is rate-limited. Read receipts drive the unread badges.
+- Reviews: one per appointment, by its client, only after closure (rating 1-5, text up to 2,000 characters). Lawyer ratings are now computed on the server with the same weighted formula, so they can't be changed from the browser. Deleting an account anonymises its reviews and deletes its messages.
+- Live updates over Server-Sent Events (`GET /api/data/events`): one stream per signed-in browser, a heartbeat every 25 s, closed on sign-out and when the session ends. New messages, read receipts, bookings, case changes, slots and reviews reach the other person instantly on any device; polling (10 s, or 60 s while the stream is up) remains as a fallback.
+- The browser no longer keeps anyone else's data: the old localStorage copies of bookings, cases, availability, messages, reviews and client profiles are deleted on load.
+- Fixed: the chat notice still said messages were stored only on this device; it now says they're seen only by the client and the lawyer, and warns against sharing passwords or OTPs (all three languages).
+- 9 new server tests (`tests/conversations.test.js`, including SSE delivery and close-on-sign-out) and 2 new browser-store tests; 116 total.
 
 ## 0.8.5 (2026-10-20)
 

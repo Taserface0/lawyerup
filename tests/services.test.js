@@ -3,9 +3,10 @@ import { isValidMobile, isValidPassword } from '../src/lib/utils.js';
 import { formatSlotDateForRecord, getAvailableSlotsForClient, createAvailabilitySlot } from '../src/services/mockAvailabilityStore.js';
 import { getCasesForClient, requestCaseResolution, keepCaseActive } from '../src/services/mockCaseStore.js';
 import { getAllMarketplaceLawyers } from '../src/services/mockLawyerStore.js';
-import { patchServerData, resetServerData } from '../src/services/serverData.js';
-import { rememberClientProfile, deleteClientDataLocally, getClientAccountByEmail } from '../src/services/mockAuthStore.js';
-import { submitReview, getReviewsForLawyer } from '../src/services/mockReviewStore.js';
+import { patchServerData } from '../src/services/serverData.js';
+import { deleteClientDataLocally, getClientAccountByEmail } from '../src/services/mockAuthStore.js';
+import { submitReview, getReviewForAppointment } from '../src/services/mockReviewStore.js';
+import { sendMessage, getMessagesForCase, markCaseMessagesRead, getUnreadCountForCase } from '../src/services/mockMessageStore.js';
 import { getAppointmentsForClient } from '../src/services/mockAppointmentStore.js';
 import { sendMobileOtp, verifyMobileOtp } from '../src/services/mockOtpService.js';
 
@@ -13,7 +14,7 @@ import { sendMobileOtp, verifyMobileOtp } from '../src/services/mockOtpService.j
 // covered by tests/data.test.js. Background writes go to a stubbed fetch.
 beforeEach(() => {
   localStorage.clear();
-  patchServerData({ approvedLawyers: [], openSlots: [], appointments: [], cases: [], mySlots: [], clients: [] });
+  patchServerData({ approvedLawyers: [], openSlots: [], ratings: {}, appointments: [], cases: [], mySlots: [], clients: [], messages: [], myReviews: [] });
   globalThis.fetch = vi.fn(async () => ({ ok: true, status: 200, json: async () => ({}) }));
 });
 
@@ -84,31 +85,67 @@ describe('marketplace', () => {
   it('only lists verified lawyers', () => {
     expect(getAllMarketplaceLawyers().every((l) => l.verified)).toBe(true);
   });
-});
 
-describe('right to erasure', () => {
-  it("removes a deleted account's bookings and profile from this browser and anonymises its reviews", () => {
-    rememberClientProfile({ role: 'client', firstName: 'Riya', lastName: 'S', name: 'Riya S', phone: '9000000001', email: 'riya@x.in', city: 'Delhi' });
-    expect(getClientAccountByEmail('RIYA@x.in')).toMatchObject({ name: 'Riya S' });
-    patchServerData({ appointments: [{ appointmentId: 'apt1', clientId: 'riya@x.in', lawyerId: 2, lawyerName: 'Adv. Farhan Sheikh', fee: 1500, createdAt: '2026-01-01' }] });
-    submitReview({ appointmentId: 'apt1', caseId: 'c1', lawyerId: 2, clientId: 'riya@x.in', clientName: 'Riya S', rating: 5, reviewText: 'my divorce case' });
-    deleteClientDataLocally('riya@x.in');
-    expect(getClientAccountByEmail('riya@x.in')).toBeNull();
-    expect(getAppointmentsForClient('riya@x.in')).toEqual([]);
-    resetServerData();
-    const [review] = getReviewsForLawyer(2);
-    expect(review).toMatchObject({ rating: 5, clientId: null, clientName: 'Former client', reviewText: '' });
+  it("shows the server's rating and appends submitted reviews to the static samples", () => {
+    const before = getAllMarketplaceLawyers().find((l) => l.id === 1);
+    patchServerData({ ratings: { 1: { rating: 4.8, reviews: 113, revs: [{ n: 'Riya S', r: 1, c: 'Late' }] } } });
+    const after = getAllMarketplaceLawyers().find((l) => l.id === 1);
+    expect(after).toMatchObject({ rating: 4.8, reviews: 113 });
+    expect(after.revs).toEqual([...before.revs, { n: 'Riya S', r: 1, c: 'Late' }]);
   });
 });
 
-describe('browser profile cache', () => {
-  it('never stores a password and removes the old mock account list', async () => {
-    localStorage.setItem('lawyerup_mock_accounts', JSON.stringify([{ email: 'a@x.in', passwordObfuscated: 'cGFzcw==' }]));
+describe('consultation messages', () => {
+  it('shows a sent message at once, sends it to the server, and counts and clears unread', () => {
+    patchServerData({ messages: [{ id: 'm1', caseId: 'c1', senderRole: 'lawyer', senderId: '1', text: 'Hi', createdAt: '2026-01-01T00:00:00Z', readAt: null }] });
+    expect(getUnreadCountForCase('c1', 'client')).toBe(1);
+    expect(getUnreadCountForCase('c1', 'lawyer')).toBe(0);
+    sendMessage({ caseId: 'c1', senderId: 'a@x.in', senderRole: 'client', text: '  Thanks  ' });
+    expect(getMessagesForCase('c1').map((m) => m.text)).toEqual(['Hi', 'Thanks']);
+    expect(fetch).toHaveBeenCalledWith('/api/data/messages', expect.objectContaining({ body: JSON.stringify({ caseId: 'c1', text: 'Thanks' }) }));
+    expect(markCaseMessagesRead('c1', 'client')).toBe(true);
+    expect(getUnreadCountForCase('c1', 'client')).toBe(0);
+    expect(markCaseMessagesRead('c1', 'client')).toBe(false); // nothing left: no second request
+    expect(fetch.mock.calls.filter(([url]) => url === '/api/data/messages/read')).toHaveLength(1);
+  });
+});
+
+describe('right to erasure', () => {
+  it("removes a deleted account's bookings, messages and reviews from this browser's copy", () => {
+    patchServerData({
+      clients: [{ role: 'client', name: 'Riya S', email: 'riya@x.in' }],
+      appointments: [{ appointmentId: 'apt1', clientId: 'riya@x.in', lawyerId: 2, lawyerName: 'Adv. Farhan Sheikh', fee: 1500, createdAt: '2026-01-01' }],
+      cases: [{ caseId: 'c1', appointmentId: 'apt1', clientId: 'riya@x.in', lawyerId: 2, status: 'CLOSED', createdAt: '2026-01-01' }],
+      messages: [{ id: 'm1', caseId: 'c1', senderRole: 'client', text: 'x', createdAt: '2026-01-01' }],
+    });
+    expect(getClientAccountByEmail('RIYA@x.in')).toMatchObject({ name: 'Riya S' });
+    submitReview({ appointmentId: 'apt1', caseId: 'c1', lawyerId: 2, clientId: 'riya@x.in', clientName: 'Riya S', rating: 5, reviewText: 'my divorce case' });
+    expect(getReviewForAppointment('apt1')).toMatchObject({ rating: 5 });
+    expect(submitReview({ appointmentId: 'apt1', caseId: 'c1', lawyerId: 2, clientId: 'riya@x.in', clientName: 'Riya S', rating: 4 })).toBeNull(); // once only
+    deleteClientDataLocally('riya@x.in');
+    expect(getAppointmentsForClient('riya@x.in')).toEqual([]);
+    expect(getMessagesForCase('c1')).toEqual([]);
+    expect(getReviewForAppointment('apt1')).toBeNull();
+  });
+});
+
+describe('browser storage', () => {
+  it('removes the old browser copies of moved data, including the old password list', async () => {
+    const legacy = [
+      'lawyerup_mock_accounts',
+      'lawyerup_mock_lawyer_applications',
+      'lawyerup_mock_appointments',
+      'lawyerup_mock_cases',
+      'lawyerup_mock_availability',
+      'lawyerup_mock_messages',
+      'lawyerup_mock_reviews',
+      'lawyerup_client_profiles',
+    ];
+    for (const key of legacy) localStorage.setItem(key, '[{"email":"a@x.in","passwordObfuscated":"cGFzcw=="}]');
     vi.resetModules();
-    const fresh = await import('../src/services/mockAuthStore.js');
-    expect(localStorage.getItem('lawyerup_mock_accounts')).toBeNull();
-    fresh.rememberClientProfile({ role: 'client', name: 'A', email: 'a@x.in', password: 'secret123', passwordHash: 'x' });
-    expect(localStorage.getItem('lawyerup_client_profiles')).not.toMatch(/secret123|passwordHash/);
+    await import('../src/services/mockAuthStore.js');
+    await import('../src/services/mockLawyerStore.js');
+    for (const key of legacy) expect(localStorage.getItem(key)).toBeNull();
   });
 });
 

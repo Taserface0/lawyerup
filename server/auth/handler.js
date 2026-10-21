@@ -22,6 +22,7 @@
 import { createRateLimiter } from '../rateLimit.js';
 import { createUserRepository } from '../db/users.js';
 import { createPracticeRepository } from '../db/practice.js';
+import { createConversationRepository } from '../db/conversations.js';
 import { hashPassword, verifyPassword, verifyAgainstDummy } from './passwords.js';
 import { createSessions, clientIp, readJsonBody, send } from './sessions.js';
 
@@ -132,9 +133,12 @@ export function createAuthMiddleware({
   seedDemoLawyer = false,
   now = Date.now,
   rateLimit = createRateLimiter({ capacity: 10, refillPerMinute: 10 }),
+  // Live-update hub shared with /api/data (server/data/events.js); optional.
+  events = { notify() {} },
 }) {
   const users = createUserRepository(db);
   const practice = createPracticeRepository(db, { now });
+  const conversations = createConversationRepository(db, { now });
   const sessions = createSessions(users, now);
   users.purgeExpiredSessions(now());
 
@@ -254,19 +258,25 @@ export function createAuthMiddleware({
     },
   };
 
-  /** Deletes a client account; its appointments, cases and sessions cascade, and their booked slots open up again. */
+  /**
+   * Deletes a client account; its appointments, cases, messages and sessions
+   * cascade, their booked slots open up again, and their reviews are
+   * anonymised (rating kept, name and text removed).
+   */
   function deleteClient(email) {
     const account = users.findByEmail(email);
     if (!account || account.role !== 'client') return false;
     db.exec('BEGIN IMMEDIATE');
     try {
       practice.releaseSlotsForClient(account.id);
+      conversations.anonymiseReviewsForClient(account.id);
       users.deleteByEmail(email);
       db.exec('COMMIT');
     } catch (err) {
       db.exec('ROLLBACK');
       throw err;
     }
+    events.notify({ everyone: true }); // freed slots, changed reviews, lawyers' client lists
     return true;
   }
 
@@ -288,7 +298,9 @@ export function createAuthMiddleware({
           return send(res, 400, { error: 'invalid-input' });
         }
         if (!practice.lawyerProfileById(body.id)) return send(res, 404, { error: 'not-found' });
-        return send(res, 200, { lawyer: practice.setLawyerStatus(body.id, body.status, body.rejectionReason || null) });
+        const lawyer = practice.setLawyerStatus(body.id, body.status, body.rejectionReason || null);
+        events.notify({ everyone: true }); // the marketplace may have changed
+        return send(res, 200, { lawyer });
       },
     });
   }

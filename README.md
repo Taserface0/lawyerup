@@ -7,7 +7,7 @@ LawyerUp is a mobile-first web app for people who suddenly need legal help: stop
 1. **Know Your Rights assistant.** An AI chat (text or voice, in English, Hindi or Hinglish) that explains what the law says and cites the provisions it relied on. It also shows emergency helplines the moment someone describes danger.
 2. **Lawyer marketplace.** Verified advocates with transparent fees, online or in-person consultations, case-specific chat, a case-resolution workflow and post-case reviews.
 
-> Status: **v0.8.1 prototype.** The AI assistant is real (through a server-side proxy, using Google Gemini's free tier or Anthropic Claude). Accounts and logins (clients and lawyers), lawyer applications, availability, bookings and cases are real (a SQLite database on the server). KYC, payments, chat messages and reviews are still local mocks backed by `localStorage`; see [What is real vs mocked](#what-is-real-vs-mocked).
+> Status: **v0.8.1 prototype.** The AI assistant is real (through a server-side proxy, using Google Gemini's free tier or Anthropic Claude). Accounts and logins (clients and lawyers), lawyer applications, availability, bookings, cases, consultation chat and reviews are real (a SQLite database on the server, with live updates). KYC, OTP, payments and document uploads are still simulated; see [What is real vs mocked](#what-is-real-vs-mocked).
 
 ---
 
@@ -108,17 +108,18 @@ Mock OTP codes are printed to the browser console, never shown in the UI.
 
 ### Database
 
-Accounts, login sessions, lawyer applications, availability slots, bookings (appointments) and cases are stored by the server in a SQLite file, `data/lawyerup.db` (set `DB_PATH` to move it). It is created on first start, uses Node's built-in `node:sqlite` (Node 22.13 or newer, nothing to install), and is excluded from git and Docker builds.
+Accounts, login sessions, lawyer applications, availability slots, bookings (appointments), cases, consultation messages and reviews are stored by the server in a SQLite file, `data/lawyerup.db` (set `DB_PATH` to move it). It is created on first start, uses Node's built-in `node:sqlite` (Node 22.13 or newer, nothing to install), and is excluded from git and Docker builds.
 
 - Passwords are hashed with scrypt and a per-user salt; the browser never stores one.
 - The session is an httpOnly cookie (7 days); the database stores only a hash of its token.
 - Every request is checked against the session on the server: a client only sees and changes their own bookings and cases, a lawyer only their own slots, bookings and cases. Only the client can request closing a case; only the assigned lawyer can keep it active or close it.
 - Booking is one transaction, and each slot can be attached to only one appointment (a UNIQUE column), so the same slot can never be booked twice, even from two browsers at once. Slot times are read as India time (IST) on the server.
 - The demo client account and its two past consultations are created on first start (`SEED_DEMO_ACCOUNT=false` skips them). The demo lawyer is created by `npm run dev` only (`SEED_DEMO_LAWYER=true` for `npm start`).
-- Screens refresh the data every 10 seconds and when the window gets focus, so a booking or case change made elsewhere shows up without a reload.
+- Chat: only the case's client and its lawyer can read or post, a closed case is read-only, and unread badges come from per-message read receipts. Reviews: one per appointment, by its client, only after the case is closed. Lawyer ratings are computed on the server (static baseline + submitted reviews, weighted), and a deleted client's reviews are anonymised rather than removed.
+- **Live updates:** each signed-in browser keeps one Server-Sent Events stream open (`GET /api/data/events`, `server/data/events.js`). When a message, booking, case change, slot or review concerns someone, the server sends them a "change" event and their browser reloads its data, so chat and badges update instantly on any device. The stream closes on sign-out (and server-side once the session ends). If it can't connect, the browser falls back to checking every 10 seconds; while connected it still checks every 60 seconds and on window focus.
 - **Reset:** stop the app and delete the `data` folder. A fresh database is created on the next start.
 
-The same account and its bookings work in any browser or device that uses the same server. Chat messages and reviews are still stored in each browser's `localStorage` and move to the database next.
+The same account, its bookings and its chats work in any browser or device that uses the same server. The browser keeps only UI preferences (`lawyerup_prefs`: language and theme), a copy of the signed-in user's own profile for a fast first screen (`lawyerup_mock_session`, removed on sign-out) and, per tab, whether the welcome popup was shown. Older copies of moved data are deleted from the browser on load.
 
 ---
 
@@ -151,11 +152,11 @@ Details, trade-offs and next steps: [docs/AI.md](docs/AI.md).
 ```
 server/             /api/chat: handler pipeline, provider switch (Gemini/Claude), rate limiter, prod server
 server/auth/        /api/auth: client and lawyer sign-up, login, sessions, password hashing, admin review
-server/data/        /api/data: marketplace, availability, booking, case workflow (with access checks)
-server/db/          SQLite database, SQL migrations, repositories (users.js, practice.js)
+server/data/        /api/data: marketplace, availability, booking, cases, chat, reviews (with access checks); events.js: live updates (SSE)
+server/db/          SQLite database, SQL migrations, repositories (users.js, practice.js, conversations.js)
 src/ai/             knowledge base, BM25 retrieval, guardrails, prompt + schema (shared by browser and server)
 src/context/        AppContext: global state via useReducer
-src/services/       authApi.js + serverData.js (server-backed) behind the original store files; localStorage mocks for messages and reviews
+src/services/       authApi.js + serverData.js (server-backed, live updates) behind the original store files; OTP, email and location stay simulated
 src/screens/        client, lawyer, consultation, admin (dev only) and legal screens
 src/components/     shared UI; src/modals/ booking and profile sheets
 src/i18n/           en.js / hi.js / hinglish.js (kept in strict key parity)
@@ -174,9 +175,10 @@ Architecture decisions that are deliberate (keep them):
 
 | Real | Mocked (replace before launch) |
 |---|---|
-| AI assistant through the server proxy | Chat messages and reviews (one device, cross-tab only) |
+| AI assistant through the server proxy | Real-time delivery beyond this app (no push notifications, SMS or email) |
 | Client and lawyer accounts, hashed passwords, login sessions (SQLite) | |
 | Lawyer applications and admin review, availability, bookings, cases (SQLite, access-checked) | |
+| Consultation chat with read receipts and live updates, reviews and server-computed ratings | |
 | Retrieval, guardrails, citation checks | OTP (console), KYC (auto-approves), document upload (filename only) |
 | Voice input and output (browser APIs) | Payments (no money moves), admin console (no auth, dev builds only) |
 | Booking with database-level double-booking prevention | Static seed lawyers in `src/data/lawyers.js` (display data) |

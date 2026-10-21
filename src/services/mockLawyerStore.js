@@ -12,7 +12,7 @@
 
 import { LAWYERS } from '../data/lawyers.js';
 import { getCityCoordinates, jitterCoordinates } from '../data/cityCoordinates.js';
-import { getReviewsForLawyer } from './mockReviewStore.js';
+import { getRatingSummaryForLawyer } from './mockReviewStore.js';
 import { serverData } from './serverData.js';
 
 // The old browser-only application list kept base64-encoded passwords. Remove it.
@@ -69,8 +69,10 @@ export function getApprovedLawyerListings() {
  * not just in the listing grid.
  */
 /**
- * Folds any real submitted reviews (see mockReviewStore.js) into a
- * lawyer's rating/reviews/revs fields. The static seed rating (e.g. 4.9
+ * Folds any real submitted reviews into a lawyer's rating/reviews/revs
+ * fields. The server computes the numbers (server/db/conversations.js,
+ * foldReviews(), same formula as below always used) so they can't be faked
+ * in the browser. The static seed rating (e.g. 4.9
  * from 112 reviews) is treated as a pre-existing weighted baseline, not
  * something recomputed from the 2-3 sample entries in revs — those were
  * always just illustrative examples, not the actual source of the
@@ -82,13 +84,9 @@ export function getApprovedLawyerListings() {
  * `lawyer.revs.map(...)` render needs no changes at all.
  */
 function applySubmittedReviews(lawyer) {
-  const submitted = getReviewsForLawyer(lawyer.id);
-  if (submitted.length === 0) return lawyer;
-  const totalReviews = lawyer.reviews + submitted.length;
-  const weightedSum = lawyer.rating * lawyer.reviews + submitted.reduce((sum, r) => sum + r.rating, 0);
-  const newRating = totalReviews > 0 ? Math.round((weightedSum / totalReviews) * 10) / 10 : lawyer.rating;
-  const newRevs = [...lawyer.revs, ...submitted.map((r) => ({ n: r.clientName, r: r.rating, c: r.reviewText }))];
-  return { ...lawyer, rating: newRating, reviews: totalReviews, revs: newRevs };
+  const summary = getRatingSummaryForLawyer(lawyer.id);
+  if (!summary) return lawyer;
+  return { ...lawyer, rating: summary.rating, reviews: summary.reviews, revs: [...lawyer.revs, ...summary.revs] };
 }
 
 // One entry per lawyer id: an approved application replaces the static seed

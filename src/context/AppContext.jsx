@@ -1,12 +1,15 @@
 import { createContext, useContext, useEffect, useReducer, useRef } from 'react';
-import { loadSession, saveSession, clearSession, rememberClientProfile } from '../services/mockAuthStore.js';
+import { loadSession, saveSession, clearSession } from '../services/mockAuthStore.js';
 import { fetchCurrentUser, signOut } from '../services/authApi.js';
-import { refreshServerData, resetServerData, DATA_EVENT, DATA_ERROR_EVENT } from '../services/serverData.js';
+import { refreshServerData, resetServerData, connectLiveUpdates, DATA_EVENT, DATA_ERROR_EVENT } from '../services/serverData.js';
 import { translations } from '../i18n/index.js';
 
-// How often signed-in screens re-check the server for bookings and case
-// changes made elsewhere (another browser, the other party).
+// How often screens re-check the server for changes made elsewhere (another
+// browser, the other party) when the live-update stream isn't connected.
+// While it is connected, they still re-check every LIVE_POLL_EVERY ticks
+// (60 s) as a safety net.
 const DATA_POLL_MS = 10_000;
+const LIVE_POLL_EVERY = 6;
 
 const initialState = {
   screen: 'home', // home | chat | lawyers | bookings | profile
@@ -188,7 +191,6 @@ export function AppProvider({ children }) {
         // Someone signed in or out while this was loading: theirs wins.
         if (previousUserRef.current?.email !== cached?.email) return;
         if (user) {
-          rememberClientProfile(user);
           dispatch({ type: 'SET_USER', payload: user });
           // A lawyer session with nothing cached started on the client Home
           // screen; open their dashboard instead, as init() does for a cached one.
@@ -221,7 +223,10 @@ export function AppProvider({ children }) {
   }, []);
 
   // Reload whenever the signed-in account changes (what you may see depends
-  // on it), then keep it fresh while the page is visible.
+  // on it), then keep it fresh. Signed in, the live-update stream
+  // (Server-Sent Events) brings changes from the other person straight away;
+  // polling is the fallback for when it can't connect, and a slow safety net
+  // when it can. Signing out closes the stream.
   const userKey = state.user ? `${state.user.role}:${state.user.email}` : '';
   const firstLoadRef = useRef(true);
   useEffect(() => {
@@ -233,9 +238,15 @@ export function AppProvider({ children }) {
     if (userKey || firstLoadRef.current) refresh();
     else resetServerData();
     firstLoadRef.current = false;
-    const timer = setInterval(refresh, DATA_POLL_MS);
+    const live = userKey ? connectLiveUpdates() : null;
+    let ticks = 0;
+    const timer = setInterval(() => {
+      ticks += 1;
+      if (!live?.isOpen() || ticks % LIVE_POLL_EVERY === 0) refresh();
+    }, DATA_POLL_MS);
     window.addEventListener('focus', refresh);
     return () => {
+      live?.close();
       clearInterval(timer);
       window.removeEventListener('focus', refresh);
     };

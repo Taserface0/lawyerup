@@ -25,7 +25,7 @@ function formatTime(iso) {
 }
 
 export default function ConsultationScreen() {
-  const { activeCaseId, activeCaseOrigin, user } = useAppState();
+  const { activeCaseId, activeCaseOrigin, user, dataVersion } = useAppState();
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const showToast = useShowToast();
@@ -99,6 +99,17 @@ export default function ConsultationScreen() {
     if (caseRecord) markCaseMessagesRead(caseRecord.caseId, viewerRole);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeCaseId]);
+
+  // Live updates: the other person's messages (and read receipts) arrive
+  // through the server's live-update stream, which reloads the data and bumps
+  // dataVersion. Re-read the thread, and since it is open on screen, mark
+  // what just arrived as read (a no-op when nothing is unread).
+  useEffect(() => {
+    if (!caseRecord) return;
+    loadMessages();
+    markCaseMessagesRead(caseRecord.caseId, viewerRole);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dataVersion]);
 
   // Cross-tab live update. This component's own sendMessage/resolution
   // handlers already refresh the UI in the tab that made the change —
